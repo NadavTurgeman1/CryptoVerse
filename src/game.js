@@ -48,7 +48,7 @@ const POWERS = [
   { id: 'missile', name: 'Stored missile', price: 160, detail: 'Fire one any time. Removes the oldest echo.' },
   { id: 'shield', name: 'Unlimited shield', price: 280, detail: 'Turn it on once. It lasts the rest of the run.' },
 ];
-const PLAY_BOTTOM = 108;
+const PLAY_BOTTOM = 46;
 const COIN_RADIUS = 20;
 const COINS = [
   { id: 'btc' },
@@ -483,6 +483,25 @@ function stockOf(id) {
   return id === 'missile' ? missileStock : shieldStock;
 }
 
+function paintPowerIcon(canvas, kind) {
+  if (!canvas) return;
+  const size = 64;
+  canvas.width = size;
+  canvas.height = size;
+  const g = canvas.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, size, size);
+  paintOn(g, () => {
+    if (kind === 'shield') drawShieldIcon(size / 2, size / 2);
+    else {
+      ctx.save();
+      ctx.translate(size / 2, size / 2);
+      drawRocket(-Math.PI / 2);
+      ctx.restore();
+    }
+  });
+}
+
 function renderPowers() {
   const root = document.getElementById('power-shop');
   if (!root) return;
@@ -490,12 +509,22 @@ function renderPowers() {
   for (const item of POWERS) {
     const row = document.createElement('div');
     row.className = 'power-row';
+    const iconWrap = document.createElement('div');
+    iconWrap.className = 'power-icon-wrap';
+    const icon = document.createElement('canvas');
+    icon.className = 'power-thumb';
+    icon.setAttribute('aria-hidden', 'true');
+    paintPowerIcon(icon, item.id);
+    const count = document.createElement('span');
+    count.className = 'power-count';
+    count.textContent = String(stockOf(item.id));
+    iconWrap.append(icon, count);
     const copy = document.createElement('div');
     copy.className = 'power-copy';
     const title = document.createElement('strong');
     title.textContent = item.name;
     const detail = document.createElement('span');
-    detail.textContent = `${item.detail} Owned ${stockOf(item.id)}.`;
+    detail.textContent = item.detail;
     copy.append(title, detail);
     const button = document.createElement('button');
     button.type = 'button';
@@ -503,7 +532,7 @@ function renderPowers() {
     button.disabled = coins < item.price;
     button.textContent = coins >= item.price ? `Buy $${item.price}` : `Need $${item.price}`;
     button.addEventListener('click', () => buyPower(item));
-    row.append(copy, button);
+    row.append(iconWrap, copy, button);
     root.append(row);
   }
 }
@@ -693,7 +722,7 @@ function fieldBounds() {
   return {
     minX: 28,
     maxX: Math.max(48, view.w - 28),
-    minY: 78,
+    minY: 118,
     maxY: Math.max(98, view.h - PLAY_BOTTOM),
   };
 }
@@ -1004,9 +1033,9 @@ function movePlayer() {
   player.x += (player.targetX - player.x) * 0.2;
   player.y += (player.targetY - player.y) * 0.2;
   player.x = clampToField(player.x, player.radius, view.w - player.radius);
-  player.y = clampToField(player.y, player.radius, view.h - player.radius - 78);
+  player.y = clampToField(player.y, player.radius, view.h - player.radius);
   player.targetX = clampToField(player.targetX, player.radius, view.w - player.radius);
-  player.targetY = clampToField(player.targetY, player.radius, view.h - player.radius - 78);
+  player.targetY = clampToField(player.targetY, player.radius, view.h - player.radius);
   player.vx = player.x - previousX;
   player.vy = player.y - previousY;
   if (player.vx * player.vx + player.vy * player.vy > 0.8 && particles.length < 70 && Math.random() < 0.45) {
@@ -1702,38 +1731,44 @@ function fillRibbon(start, control, end, half) {
 }
 
 function drawBitcoinMark(radius) {
-  const height = radius * 0.62;
-  const width = height * (405 / 553);
-  const x = (unit) => (unit - 0.5) * width * 2;
-  const y = (unit) => (unit - 0.5) * height * 2;
+  const halfH = radius * 0.64;
+  const halfW = halfH * (539 / 746);
+  const x = (unit) => -halfW + unit * halfW * 2;
+  const y = (unit) => -halfH + unit * halfH * 2;
+  const stub = (u0, u1, v0, v1) => {
+    ctx.fillRect(x(u0), y(v0), x(u1) - x(u0), y(v1) - y(v0));
+  };
   ctx.fillStyle = '#0d0d0d';
-  const bar = x(0.12) - x(0);
-  ctx.fillRect(x(0.24), y(0.0), bar, y(0.94) - y(0.0));
-  ctx.fillRect(x(0.40), y(0.05), bar, y(1) - y(0.05));
+  stub(0.258, 0.382, 0, 0.16);
+  stub(0.488, 0.612, 0, 0.16);
+  stub(0.258, 0.382, 0.84, 1);
+  stub(0.488, 0.612, 0.84, 1);
 
   ctx.beginPath();
-  ctx.moveTo(x(0.16), y(0.14));
-  ctx.lineTo(x(0.48), y(0.14));
-  ctx.bezierCurveTo(x(0.96), y(0.12), x(1.0), y(0.42), x(0.46), y(0.44));
-  ctx.lineTo(x(0.18), y(0.44));
+  ctx.moveTo(x(0), y(0.16));
+  ctx.lineTo(x(0.5), y(0.16));
+  ctx.bezierCurveTo(x(0.98), y(0.16), x(0.96), y(0.4), x(0.55), y(0.45));
+  ctx.lineTo(x(0.17), y(0.45));
+  ctx.lineTo(x(0.17), y(0.24));
+  ctx.lineTo(x(0), y(0.24));
   ctx.closePath();
-  ctx.moveTo(x(0.52), y(0.24));
-  ctx.bezierCurveTo(x(0.78), y(0.22), x(0.8), y(0.36), x(0.5), y(0.36));
-  ctx.lineTo(x(0.46), y(0.36));
-  ctx.lineTo(x(0.46), y(0.24));
+  ctx.moveTo(x(0.4), y(0.28));
+  ctx.bezierCurveTo(x(0.78), y(0.26), x(0.8), y(0.4), x(0.4), y(0.42));
   ctx.closePath();
   ctx.fill('evenodd');
 
   ctx.beginPath();
-  ctx.moveTo(x(0.02), y(0.5));
-  ctx.lineTo(x(0.5), y(0.5));
-  ctx.bezierCurveTo(x(1.02), y(0.48), x(1.04), y(0.78), x(0.46), y(0.8));
-  ctx.lineTo(x(0.04), y(0.8));
+  ctx.moveTo(x(0.17), y(0.48));
+  ctx.lineTo(x(0.58), y(0.48));
+  ctx.bezierCurveTo(x(1.04), y(0.5), x(1.02), y(0.74), x(0.5), y(0.78));
+  ctx.lineTo(x(0.17), y(0.78));
+  ctx.lineTo(x(0.17), y(0.84));
+  ctx.lineTo(x(0), y(0.84));
+  ctx.lineTo(x(0), y(0.74));
+  ctx.lineTo(x(0.17), y(0.74));
   ctx.closePath();
-  ctx.moveTo(x(0.5), y(0.58));
-  ctx.bezierCurveTo(x(0.82), y(0.56), x(0.84), y(0.72), x(0.48), y(0.72));
-  ctx.lineTo(x(0.4), y(0.72));
-  ctx.lineTo(x(0.4), y(0.58));
+  ctx.moveTo(x(0.4), y(0.56));
+  ctx.bezierCurveTo(x(0.9), y(0.54), x(0.92), y(0.7), x(0.4), y(0.72));
   ctx.closePath();
   ctx.fill('evenodd');
 }
@@ -1844,7 +1879,7 @@ function drawSolanaMark(radius) {
 }
 
 function drawDogeMark(radius) {
-  const r = radius * 0.62;
+  const r = radius * 0.84;
   ctx.fillStyle = '#0d0d0d';
   ctx.beginPath();
   ctx.moveTo(-r * 0.32, -r * 0.54);
@@ -2358,7 +2393,7 @@ function fieldLimits() {
     minX: player.radius,
     maxX: view.w - player.radius,
     minY: player.radius,
-    maxY: view.h - player.radius - 78,
+    maxY: view.h - player.radius,
   };
 }
 
@@ -2463,6 +2498,8 @@ function bindUI() {
   document.getElementById('try-on-buy').addEventListener('click', confirmTryOn);
   document.getElementById('use-missile').addEventListener('click', useStoredMissile);
   document.getElementById('use-shield').addEventListener('click', useStoredShield);
+  paintPowerIcon(document.getElementById('missile-icon'), 'missile');
+  paintPowerIcon(document.getElementById('shield-icon'), 'shield');
 }
 
 loadSave();
