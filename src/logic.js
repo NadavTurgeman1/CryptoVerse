@@ -168,6 +168,22 @@ export function pickSpawn(rand, bounds, blockers, cluster) {
   };
 }
 
+/** Buy one stored charge. Stock has no cap. A short wallet buys nothing. */
+export function buyCharge(coins, stock, price) {
+  const owned = Math.max(0, Math.floor(Number(stock)) || 0);
+  const wallet = Math.max(0, Math.floor(Number(coins)) || 0);
+  const cost = Math.max(0, Math.floor(Number(price)) || 0);
+  if (wallet < cost) return { coins: wallet, stock: owned, status: 'broke' };
+  return { coins: wallet - cost, stock: owned + 1, status: 'bought' };
+}
+
+/** Spend one stored charge. An empty stock stays empty. */
+export function spendCharge(stock) {
+  const owned = Math.max(0, Math.floor(Number(stock)) || 0);
+  if (owned <= 0) return { stock: 0, status: 'empty' };
+  return { stock: owned - 1, status: 'spent' };
+}
+
 export function resolvePurchase(state, item) {
   if (state.unlocked.includes(item.id)) {
     return {

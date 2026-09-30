@@ -21,9 +21,14 @@
         </div>
       </div>
 
+      <div id="power-bar">
+        <button type="button" class="power-btn" id="use-missile">Missile <span id="missile-stock">0</span></button>
+        <button type="button" class="power-btn" id="use-shield">Shield <span id="shield-stock">0</span></button>
+      </div>
+
       <canvas id="gameCanvas" width="480" height="800" aria-label="Game arena"></canvas>
 
-      <div id="controls-hint">Slide anywhere to move, or use arrows / WASD</div>
+      <div id="controls-hint">Slide anywhere to move, or use arrows / WASD. M fires a stored missile. F turns on an unlimited shield.</div>
       <div id="toast" class="toast hidden" role="status" aria-hidden="true"></div>
       <div id="live" class="sr-only" aria-live="polite"></div>
 
@@ -37,6 +42,11 @@
       <div id="shop-screen" class="screen hidden">
         <h1>Shop</h1>
         <p class="subtitle">Balance: $<span id="wallet-val">0</span></p>
+        <div class="panel-box">
+          <div class="panel-title">Powers</div>
+          <p class="try-caption">Buy these before a run, then use them any time during play. There is no stock cap.</p>
+          <div id="power-shop"></div>
+        </div>
         <div class="panel-box">
           <div class="panel-title">Profile</div>
           <div id="profile-stats"></div>

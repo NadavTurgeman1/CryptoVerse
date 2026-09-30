@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   applyCosmetic,
+  buyCharge,
   dropOldestEcho,
+  spendCharge,
   echoClock,
   ghostPoint,
   hitsEcho,
@@ -192,6 +194,26 @@ test('later rounds speed the echoes up, shorten the grace, and pull coins into a
   const dist = Math.hypot(point.x - 200, point.y - 300);
   assert.ok(dist >= 40, `coin landed on the anchor (${dist})`);
   assert.ok(dist <= 120.5, `coin left the cluster (${dist})`);
+});
+
+test('stored charges stack without a cap and a broke wallet buys nothing', () => {
+  const first = buyCharge(200, 0, 160);
+  assert.equal(first.status, 'bought');
+  assert.equal(first.coins, 40);
+  assert.equal(first.stock, 1);
+  const second = buyCharge(400, first.stock, 160);
+  assert.equal(second.stock, 2);
+  assert.equal(second.coins, 240);
+  const broke = buyCharge(159, 4, 160);
+  assert.equal(broke.status, 'broke');
+  assert.equal(broke.coins, 159);
+  assert.equal(broke.stock, 4);
+  const spent = spendCharge(second.stock);
+  assert.equal(spent.status, 'spent');
+  assert.equal(spent.stock, 1);
+  const empty = spendCharge(0);
+  assert.equal(empty.status, 'empty');
+  assert.equal(empty.stock, 0);
 });
 
 test('spawns stay away from the player when the field has room', () => {

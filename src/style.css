@@ -366,6 +366,80 @@ h1 {
   color: var(--text-muted);
 }
 
+#power-bar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: max(46px, calc(env(safe-area-inset-bottom) + 34px));
+  display: none;
+  gap: 8px;
+  z-index: 13;
+}
+
+#game-container[data-state="PLAYING"] #power-bar {
+  display: flex;
+}
+
+.power-btn {
+  appearance: none;
+  font: inherit;
+  flex: 1;
+  min-height: 42px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(14, 16, 24, 0.92);
+  color: var(--text-main);
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.power-btn.empty {
+  color: var(--text-muted);
+}
+
+.power-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.power-row + .power-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.power-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.power-copy strong {
+  font-size: 0.95rem;
+}
+
+.power-copy span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.power-buy {
+  width: auto;
+  min-width: 108px;
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+}
+
+.power-buy:disabled {
+  opacity: 0.5;
+  cursor: default;
+  box-shadow: none;
+}
+
 #controls-hint {
   position: absolute;
   bottom: max(16px, env(safe-area-inset-bottom));
@@ -386,7 +460,7 @@ h1 {
 
 .toast {
   position: absolute;
-  bottom: 72px;
+  bottom: 112px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 8;
