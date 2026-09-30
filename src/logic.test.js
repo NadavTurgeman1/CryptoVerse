@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   applyCosmetic,
+  dropOldestEcho,
   ghostPoint,
   hitsEcho,
+  stepHoming,
   joystickVector,
   pickSpawn,
   previewLoadout,
@@ -126,6 +128,28 @@ test('the joystick clamps to its radius and keeps direction', () => {
   assert.equal(outside.amount, 1);
   assert.ok(Math.abs(outside.x + 1) < 1e-9);
   assert.equal(outside.y, 0);
+});
+
+test('a missile removes only the oldest echo', () => {
+  const first = [{ x: 1, y: 1 }];
+  const second = [{ x: 2, y: 2 }];
+  const third = [{ x: 3, y: 3 }];
+  const hit = dropOldestEcho([first, second, third]);
+  assert.equal(hit.removed, true);
+  assert.deepEqual(hit.echoes, [second, third]);
+  const miss = dropOldestEcho([]);
+  assert.equal(miss.removed, false);
+  assert.deepEqual(miss.echoes, []);
+});
+
+test('a homing step moves toward the target and reports the gap', () => {
+  const next = stepHoming({ x: 0, y: 0, vx: 0, vy: 0 }, { x: 100, y: 0 }, 10, 1);
+  assert.equal(next.distance, 100);
+  assert.ok(Math.abs(next.x - 10) < 1e-9);
+  assert.equal(next.y, 0);
+  const arrived = stepHoming({ x: 4, y: 4, vx: 1, vy: 0 }, { x: 4, y: 4 }, 10, 1);
+  assert.equal(arrived.distance, 0);
+  assert.equal(arrived.x, 4);
 });
 
 test('spawns stay away from the player when the field has room', () => {

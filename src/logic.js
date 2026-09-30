@@ -32,6 +32,35 @@ export function ghostPoint(echo, frame) {
   return echo[index];
 }
 
+/** The first sealed route is the oldest echo. Later routes stay in order. */
+export function dropOldestEcho(echoes) {
+  if (!Array.isArray(echoes) || echoes.length === 0) {
+    return { echoes: Array.isArray(echoes) ? echoes : [], removed: false };
+  }
+  return { echoes: echoes.slice(1), removed: true };
+}
+
+/** One homing step. `turn` is 0..1, and `distance` is measured before the move. */
+export function stepHoming(missile, target, speed, turn) {
+  const dx = target.x - missile.x;
+  const dy = target.y - missile.y;
+  const distance = Math.hypot(dx, dy);
+  if (!(distance > 0)) {
+    return { x: target.x, y: target.y, vx: 0, vy: 0, distance: 0 };
+  }
+  const desiredVx = (dx / distance) * speed;
+  const desiredVy = (dy / distance) * speed;
+  const vx = missile.vx + (desiredVx - missile.vx) * turn;
+  const vy = missile.vy + (desiredVy - missile.vy) * turn;
+  return {
+    x: missile.x + vx,
+    y: missile.y + vy,
+    vx,
+    vy,
+    distance,
+  };
+}
+
 export function hitsEcho(player, echoes, frame, hitDist, vulnerable) {
   if (!vulnerable) return false;
   for (const echo of echoes) {

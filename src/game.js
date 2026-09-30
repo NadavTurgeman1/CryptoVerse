@@ -2,7 +2,9 @@ import {
   applyCosmetic,
   clamp,
   clampInt,
+  dropOldestEcho,
   ghostPoint,
+  stepHoming,
   hitsEcho,
   joystickVector,
   pickSpawn,
@@ -101,6 +103,8 @@ const AudioEngine = {
   coin() { this.play(587.33, 'sine', 0.15); },
   hit() { this.play(120, 'sawtooth', 0.4); },
   powerup() { this.play(880, 'triangle', 0.3); },
+  launch() { this.play(360, 'sawtooth', 0.16); },
+  blast() { this.play(96, 'square', 0.22); },
   deny() { this.play(180, 'square', 0.08); },
   round() {
     this.play(523.25, 'triangle', 0.12);
@@ -134,6 +138,8 @@ let powerups = [];
 let particles = [];
 let activePowerup = null;
 let powerupTimer = 0;
+let missile = null;
+let impacts = [];
 let grace = 0;
 let roundFrame = 0;
 let skipFrameTick = false;
@@ -594,7 +600,7 @@ function spawnCollectibles() {
     powerups.push({
       x: point.x,
       y: point.y,
-      type: Math.random() < 0.5 ? 'SHIELD' : 'COIN',
+      type: ['SHIELD', 'COIN', 'MISSILE'][Math.floor(Math.random() * 3)],
     });
   }
 }
@@ -626,6 +632,8 @@ function startGame() {
   currentPath = [];
   powerups = [];
   particles = [];
+  missile = null;
+  impacts = [];
   activePowerup = null;
   powerupTimer = 0;
   grace = 0;
@@ -709,11 +717,16 @@ function advanceRound() {
 }
 
 function applyPowerup(power) {
-  burst(power.x, power.y, power.type === 'SHIELD' ? '#00f0ff' : '#ffbb00');
+  const color = power.type === 'SHIELD' ? '#00f0ff' : power.type === 'MISSILE' ? '#ff5a1f' : '#ffbb00';
+  burst(power.x, power.y, color);
   if (power.type === 'SHIELD') {
     activePowerup = 'SHIELD';
     powerupTimer = SHIELD_FRAMES;
     AudioEngine.powerup();
+    return;
+  }
+  if (power.type === 'MISSILE') {
+    launchMissile();
     return;
   }
 
@@ -722,6 +735,77 @@ function applyPowerup(power) {
   saveAll();
   AudioEngine.coin();
   showToast(`Bonus +${COIN_BONUS} coins`);
+}
+
+function launchMissile() {
+  const target = ghostPoint(echoes[0], roundFrame);
+  if (!target) {
+    AudioEngine.deny();
+    showToast('No echo yet');
+    return;
+  }
+  const dx = target.x - player.x;
+  const dy = target.y - player.y;
+  const distance = Math.hypot(dx, dy) || 1;
+  missile = {
+    x: player.x,
+    y: player.y,
+    vx: (dx / distance) * 7,
+    vy: (dy / distance) * 7,
+    trail: [{ x: player.x, y: player.y }],
+  };
+  AudioEngine.launch();
+  showToast('Missile away');
+}
+
+function detonateMissile(x, y, hit) {
+  missile = null;
+  impacts.push({ x, y, life: 28 });
+  shake = hit ? 9 : 3;
+  burst(x, y, '#ff6a00');
+  burst(x, y, '#fff1c2');
+  if (!hit) return;
+  const next = dropOldestEcho(echoes);
+  echoes = next.echoes;
+  score += 20;
+  AudioEngine.blast();
+  showToast('Oldest echo destroyed');
+  announce('Oldest echo destroyed');
+}
+
+function stepMissile() {
+  if (missile) {
+    const target = ghostPoint(echoes[0], roundFrame);
+    if (!target) {
+      detonateMissile(missile.x, missile.y, false);
+    } else if (missile) {
+      const next = stepHoming(missile, target, 13, 0.45);
+      if (next.distance < 20) {
+        detonateMissile(target.x, target.y, true);
+      } else {
+        missile.x = next.x;
+        missile.y = next.y;
+        missile.vx = next.vx;
+        missile.vy = next.vy;
+        missile.trail.push({ x: missile.x, y: missile.y });
+        if (missile.trail.length > 14) missile.trail.shift();
+        if (particles.length < 80 && Math.random() < 0.8) {
+          particles.push({
+            x: missile.x - missile.vx * 0.8,
+            y: missile.y - missile.vy * 0.8,
+            vx: -missile.vx * 0.05 + (Math.random() - 0.5) * 0.6,
+            vy: -missile.vy * 0.05 + (Math.random() - 0.5) * 0.6,
+            life: 12,
+            color: Math.random() < 0.5 ? '#fff1c2' : '#ff4d00',
+          });
+        }
+      }
+    }
+  }
+  for (let i = impacts.length - 1; i >= 0; i -= 1) {
+    impacts[i].life -= 1;
+    if (impacts[i].life <= 0) impacts.splice(i, 1);
+  }
 }
 
 function collectCoins() {
@@ -817,6 +901,7 @@ function update() {
   currentPath.push({ x: player.x, y: player.y });
   collectCoins();
   collectPowerups();
+  stepMissile();
   tickShield();
   stepParticles();
 
@@ -849,6 +934,7 @@ function gameOver() {
   const summary = `Round ${currentRound} · ${score} pts${celebrate}`;
   setText('final-stats', summary);
   setText('final-best', `Best: ${bestScore} pts · Round ${bestRound}`);
+  missile = null;
   setMode('GAMEOVER');
   showScreen('game-over-screen');
   burst(player.x, player.y, '#fff1c2');
@@ -1403,27 +1489,16 @@ function drawGoldCoin(x, y, radius) {
   ctx.lineWidth = Math.max(1.2, r * 0.07);
   ctx.stroke();
 
-  ctx.fillStyle = '#a86400';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
   ctx.beginPath();
-  ctx.moveTo(0, -r * 0.36);
-  ctx.lineTo(r * 0.24, 0);
-  ctx.lineTo(0, r * 0.36);
-  ctx.lineTo(-r * 0.24, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#fff1b8';
-  ctx.beginPath();
-  ctx.moveTo(0, -r * 0.18);
-  ctx.lineTo(r * 0.1, 0);
-  ctx.lineTo(0, r * 0.18);
-  ctx.lineTo(-r * 0.1, 0);
-  ctx.closePath();
+  ctx.ellipse(-r * 0.32, -r * 0.34, r * 0.16, r * 0.08, -0.7, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
-  ctx.beginPath();
-  ctx.ellipse(-r * 0.28, -r * 0.32, r * 0.22, r * 0.11, -0.7, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.fillStyle = '#6a3808';
+  ctx.font = `800 ${Math.max(11, r * 1.15)}px "Noto Sans", "Liberation Sans", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('₿', r * 0.02, r * 0.06);
   ctx.restore();
 }
 
@@ -1436,6 +1511,7 @@ function drawPickups() {
 
   for (const power of powerups) {
     if (power.type === 'SHIELD') drawShieldIcon(power.x, power.y);
+    else if (power.type === 'MISSILE') drawMissileIcon(power.x, power.y);
     else drawBonusIcon(power.x, power.y);
   }
 }
@@ -1454,6 +1530,93 @@ function drawShieldIcon(x, y) {
   ctx.closePath();
   ctx.fill();
   ctx.restore();
+}
+
+function drawRocket(angle) {
+  ctx.save();
+  ctx.rotate(angle);
+  ctx.fillStyle = '#ffb423';
+  ctx.beginPath();
+  ctx.moveTo(-10, 0);
+  ctx.lineTo(-18, -3.5);
+  ctx.lineTo(-15, 0);
+  ctx.lineTo(-18, 3.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#fff6e8';
+  ctx.beginPath();
+  ctx.moveTo(14, 0);
+  ctx.lineTo(-7, 5);
+  ctx.lineTo(-7, -5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#ff3b30';
+  ctx.beginPath();
+  ctx.moveTo(-2, -5);
+  ctx.lineTo(-8, -9);
+  ctx.lineTo(-7, -4);
+  ctx.closePath();
+  ctx.moveTo(-2, 5);
+  ctx.lineTo(-8, 9);
+  ctx.lineTo(-7, 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawMissileIcon(x, y) {
+  const bob = Math.sin(performance.now() / 220) * 2;
+  ctx.save();
+  ctx.translate(x, y + bob);
+  const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 20);
+  glow.addColorStop(0, 'rgba(255, 120, 40, 0.55)');
+  glow.addColorStop(1, 'rgba(255, 60, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(0, 0, 20, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowColor = '#ff5a1f';
+  ctx.shadowBlur = 12;
+  drawRocket(-Math.PI / 2);
+  ctx.restore();
+}
+
+function drawMissile() {
+  if (missile) {
+    ctx.save();
+    missile.trail.forEach((point, index) => {
+      const t = (index + 1) / missile.trail.length;
+      ctx.globalAlpha = t * 0.75;
+      ctx.fillStyle = t > 0.65 ? '#fff1c2' : '#ff4a00';
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 1.5 + t * 5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    ctx.translate(missile.x, missile.y);
+    const angle = Math.atan2(missile.vy, missile.vx);
+    ctx.shadowColor = '#ff6a00';
+    ctx.shadowBlur = 16;
+    drawRocket(angle);
+    ctx.restore();
+  }
+
+  for (const impact of impacts) {
+    const t = 1 - impact.life / 28;
+    ctx.save();
+    ctx.globalAlpha = 1 - t;
+    ctx.strokeStyle = '#ffb423';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(impact.x, impact.y, 8 + t * 42, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255, 244, 210, 0.9)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(impact.x, impact.y, 4 + t * 22, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function drawBonusIcon(x, y) {
@@ -1631,6 +1794,7 @@ function draw() {
     drawEchoes();
     drawPickups();
     drawParticles();
+    drawMissile();
     drawPlayer();
     drawDragReticle();
     drawJoystick();
@@ -1824,6 +1988,9 @@ if (import.meta.env.DEV) {
       currentRound,
       echoCount: echoes.length,
       pathLength: currentPath.length,
+      pathHead: currentPath[0] ? { ...currentPath[0] } : null,
+      pathTail: currentPath.length ? { ...currentPath[currentPath.length - 1] } : null,
+      missile: missile ? { x: missile.x, y: missile.y, trail: missile.trail.length } : null,
       collectibles: collectibles.map((coin) => ({ ...coin })),
       powerups: powerups.map((power) => ({ ...power })),
       activePowerup,

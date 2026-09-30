@@ -24,7 +24,7 @@ npm run build
 - In the shop, tap an item to see it on an echo before you buy it. Color, hat, and glasses can be previewed together.
 - Collect three coins to seal the round. The path you just drew becomes a ghost.
 - You are safe for a short moment when a new echo wakes up, and for a moment after a shield ends.
-- Cyan shields block a hit for about five seconds. Gold `+` pickups add 5 coins and 25 points without cancelling a shield.
+- Cyan shields block a hit for about five seconds. Gold `+` pickups add 5 coins and 25 points without cancelling a shield. An orange missile flies into the oldest echo and removes it.
 - Shop colors, hats, and glasses dress the echoes that chase you. One of each can be worn at the same time. You stay a fireball.
 
 ## Fixes from the first draft
