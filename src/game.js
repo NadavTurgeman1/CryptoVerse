@@ -1792,6 +1792,14 @@ function drawCryptoMark(kind, radius) {
 function drawCryptoCoin(x, y, radius, kind) {
   ctx.save();
   ctx.translate(x, y);
+  const haze = ctx.createRadialGradient(0, -radius * 0.1, radius * 0.2, 0, 0, radius * 2.5);
+  haze.addColorStop(0, 'rgba(240, 193, 75, 0.18)');
+  haze.addColorStop(1, 'rgba(240, 193, 75, 0)');
+  ctx.fillStyle = haze;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 2.5, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
   ctx.beginPath();
   ctx.ellipse(1, radius * 1.02, radius * 0.86, radius * 0.26, 0, 0, Math.PI * 2);
@@ -1803,10 +1811,10 @@ function drawCryptoCoin(x, y, radius, kind) {
   ctx.fill();
 
   const rim = ctx.createLinearGradient(-radius, -radius, radius * 0.8, radius);
-  rim.addColorStop(0, '#fff6cf');
-  rim.addColorStop(0.28, '#f2c85a');
-  rim.addColorStop(0.62, '#c88816');
-  rim.addColorStop(1, '#6a3a0c');
+  rim.addColorStop(0, '#e4c98a');
+  rim.addColorStop(0.28, '#c4963a');
+  rim.addColorStop(0.62, '#8d6216');
+  rim.addColorStop(1, '#4a2c0c');
   ctx.fillStyle = rim;
   ctx.beginPath();
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
@@ -1829,10 +1837,10 @@ function drawCryptoCoin(x, y, radius, kind) {
   ctx.restore();
 
   const face = ctx.createRadialGradient(-radius * 0.32, -radius * 0.38, radius * 0.04, radius * 0.1, radius * 0.16, radius * 0.78);
-  face.addColorStop(0, '#fff8e2');
-  face.addColorStop(0.38, '#f6d36a');
-  face.addColorStop(0.78, '#e0a31c');
-  face.addColorStop(1, '#a86c08');
+  face.addColorStop(0, '#e6c98a');
+  face.addColorStop(0.38, '#c99632');
+  face.addColorStop(0.78, '#9a6c14');
+  face.addColorStop(1, '#6e4510');
   ctx.fillStyle = face;
   ctx.beginPath();
   ctx.arc(0, 0, radius * 0.74, 0, Math.PI * 2);
@@ -1843,7 +1851,7 @@ function drawCryptoCoin(x, y, radius, kind) {
   ctx.beginPath();
   ctx.arc(0, 0, radius * 0.68, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.strokeStyle = 'rgba(255, 244, 206, 0.7)';
+  ctx.strokeStyle = 'rgba(255, 236, 196, 0.28)';
   ctx.lineWidth = Math.max(0.6, radius * 0.02);
   ctx.beginPath();
   ctx.arc(0, 0, radius * 0.64, 0, Math.PI * 2);
@@ -1856,13 +1864,13 @@ function drawCryptoCoin(x, y, radius, kind) {
   drawCryptoMark(kind, radius);
   ctx.restore();
 
-  ctx.strokeStyle = 'rgba(255, 250, 230, 0.75)';
-  ctx.lineWidth = Math.max(1, radius * 0.07);
+  ctx.strokeStyle = 'rgba(255, 236, 196, 0.38)';
+  ctx.lineWidth = Math.max(0.8, radius * 0.045);
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.arc(0, 0, radius * 0.88, Math.PI * 1.15, Math.PI * 1.72);
   ctx.stroke();
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+  ctx.fillStyle = 'rgba(255, 244, 214, 0.42)';
   ctx.beginPath();
   ctx.arc(-radius * 0.42, -radius * 0.38, Math.max(0.8, radius * 0.045), 0, Math.PI * 2);
   ctx.fill();
@@ -1886,11 +1894,6 @@ function drawGlow(x, y, radius, color, peak) {
 function drawSceneLights() {
   drawGlow(player.x, player.y, 230, '255, 150, 60', 0.62);
   drawGlow(player.x, player.y, 70, '255, 230, 180', 0.5);
-  const now = performance.now();
-  collectibles.forEach((coin, index) => {
-    const bob = Math.sin(now / 220 + index) * 3;
-    drawGlow(coin.x, coin.y + bob, 78, '255, 196, 70', 0.4);
-  });
 }
 
 function drawPickups() {
