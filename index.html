@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#0d0f18" />
+    <title>Echo</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="game-container" data-state="MENU">
+      <div id="hud">
+        <div class="hud-group">
+          <div class="hud-item">נק׳ <span id="score-val">0</span></div>
+          <div class="hud-item">סיבוב <span id="round-val">1</span></div>
+        </div>
+        <div class="hud-group">
+          <div class="hud-item">🪙 <span id="coins-val">0</span></div>
+          <div class="hud-item" id="powerup-status">כוח: אין</div>
+        </div>
+      </div>
+
+      <canvas id="gameCanvas" width="480" height="800" aria-label="מגרש המשחק"></canvas>
+
+      <div id="controls-hint">גרור לזוז, או חצים ו־WASD · הימנע מההדים שלך</div>
+      <div id="toast" class="toast hidden" role="status" aria-hidden="true"></div>
+      <div id="live" class="sr-only" aria-live="polite"></div>
+
+      <div id="main-menu" class="screen">
+        <h1>ECHO</h1>
+        <p class="subtitle">ברח מהעבר של עצמך במסע אינסופי</p>
+        <p class="best" id="menu-best">עדיין אין שיא</p>
+        <ul class="rules">
+          <li>אסוף שלושה מטבעות כדי לסגור סיבוב</li>
+          <li>המסלול שרשמת חוזר אליך כהד</li>
+          <li>מגן חוסם פגיעה, מטבע זהב נותן בונוס</li>
+        </ul>
+        <button type="button" class="btn" id="start-btn">התחל משחק</button>
+        <button type="button" class="btn btn-secondary" id="shop-btn">חנות ופרופיל</button>
+      </div>
+
+      <div id="shop-screen" class="screen hidden">
+        <h1>חנות הדים</h1>
+        <p class="subtitle">יתרה: <span id="wallet-val">0</span> מטבעות</p>
+        <div class="panel-box">
+          <div class="panel-title">פרופיל</div>
+          <div id="profile-stats"></div>
+        </div>
+        <div class="panel-box">
+          <div class="panel-title">צבעי דמות</div>
+          <div class="shop-grid" id="color-shop"></div>
+        </div>
+        <button type="button" class="btn" id="close-shop">חזרה</button>
+      </div>
+
+      <div id="game-over-screen" class="screen hidden">
+        <h1>הפסדת</h1>
+        <p class="subtitle" id="final-stats">סיבוב 1 · 0 נקודות</p>
+        <p class="best" id="final-best"></p>
+        <button type="button" class="btn" id="retry-btn">שחק שוב</button>
+        <button type="button" class="btn btn-secondary" id="menu-btn">תפריט ראשי</button>
+      </div>
+    </div>
+    <script type="module" src="/src/game.js"></script>
+  </body>
+</html>
