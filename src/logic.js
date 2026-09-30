@@ -117,3 +117,18 @@ export function resolvePurchase(state, item) {
     status: 'bought',
   };
 }
+
+/** Equip one shop slot without clearing the others, so a color, hat, and glasses can be worn together. */
+export function applyCosmetic(loadout, item) {
+  const result = resolvePurchase({
+    coins: loadout.coins,
+    unlocked: loadout.unlocked[item.slot],
+    active: loadout.active[item.slot],
+  }, item);
+  return {
+    coins: result.coins,
+    unlocked: { ...loadout.unlocked, [item.slot]: result.unlocked },
+    active: { ...loadout.active, [item.slot]: result.active },
+    status: result.status,
+  };
+}

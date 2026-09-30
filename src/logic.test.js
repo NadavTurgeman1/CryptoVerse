@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  applyCosmetic,
   ghostPoint,
   hitsEcho,
   pickSpawn,
@@ -76,6 +77,32 @@ test('shop equips owned colors, buys affordable ones, and refuses the rest', () 
   assert.equal(broke.status, 'broke');
   assert.equal(broke.active, '#00f0ff');
   assert.equal(broke.coins, 49);
+});
+
+test('a color, a hat, and glasses equip together', () => {
+  const withHat = applyCosmetic({
+    coins: 400,
+    unlocked: { color: ['#ff2a55'], hat: ['none'], glasses: ['none'] },
+    active: { color: '#ff2a55', hat: 'none', glasses: 'none' },
+  }, { slot: 'hat', id: 'cap', price: 40 });
+  const withBoth = applyCosmetic({
+    coins: withHat.coins,
+    unlocked: withHat.unlocked,
+    active: withHat.active,
+  }, { slot: 'glasses', id: 'shades', price: 90 });
+  const recolored = applyCosmetic({
+    coins: withBoth.coins,
+    unlocked: withBoth.unlocked,
+    active: withBoth.active,
+  }, { slot: 'color', id: '#b388ff', price: 80 });
+
+  assert.equal(recolored.status, 'bought');
+  assert.equal(recolored.coins, 400 - 40 - 90 - 80);
+  assert.equal(recolored.active.color, '#b388ff');
+  assert.equal(recolored.active.hat, 'cap');
+  assert.equal(recolored.active.glasses, 'shades');
+  assert.deepEqual(recolored.unlocked.hat, ['none', 'cap']);
+  assert.deepEqual(recolored.unlocked.glasses, ['none', 'shades']);
 });
 
 test('spawns stay away from the player when the field has room', () => {

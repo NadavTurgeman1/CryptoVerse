@@ -57,7 +57,7 @@ body {
   }
 }
 
-canvas {
+#gameCanvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -261,10 +261,28 @@ h1 {
   font-weight: 700;
 }
 
+.preview-box {
+  align-items: center;
+}
+
+#loadout-preview {
+  position: static;
+  width: 180px;
+  height: 168px;
+  display: block;
+}
+
 .shop-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
+}
+
+.thumb {
+  position: static;
+  width: 56px;
+  height: 40px;
+  display: block;
 }
 
 .shop-item {

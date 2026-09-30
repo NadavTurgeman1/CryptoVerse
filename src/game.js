@@ -1,27 +1,49 @@
 import {
+  applyCosmetic,
   clamp,
   clampInt,
   ghostPoint,
   hitsEcho,
   pickSpawn,
-  resolvePurchase,
   safeJson,
   sanitizeUnlocks,
   sealPath,
   takeOverlaps,
 } from './logic.js';
 
-const CATALOG = [
-  { id: '#00f0ff', name: 'Cyan', price: 0 },
-  { id: '#ff0055', name: 'Magenta', price: 50 },
-  { id: '#00ff66', name: 'Matrix', price: 100 },
-  { id: '#ffbb00', name: 'Gold', price: 150 },
+const COLORS = [
+  { id: '#ff2a55', name: 'Rose', price: 0, slot: 'color' },
+  { id: '#00f0ff', name: 'Cyan', price: 50, slot: 'color' },
+  { id: '#b388ff', name: 'Violet', price: 80, slot: 'color' },
+  { id: '#00ff66', name: 'Matrix', price: 100, slot: 'color' },
+  { id: '#ffbb00', name: 'Gold', price: 150, slot: 'color' },
 ];
+
+const HATS = [
+  { id: 'none', name: 'None', price: 0, slot: 'hat' },
+  { id: 'cap', name: 'Cap', price: 40, slot: 'hat' },
+  { id: 'beanie', name: 'Beanie', price: 75, slot: 'hat' },
+  { id: 'tophat', name: 'Top hat', price: 120, slot: 'hat' },
+  { id: 'crown', name: 'Crown', price: 200, slot: 'hat' },
+];
+
+const GLASSES = [
+  { id: 'none', name: 'None', price: 0, slot: 'glasses' },
+  { id: 'rounds', name: 'Rounds', price: 45, slot: 'glasses' },
+  { id: 'shades', name: 'Shades', price: 90, slot: 'glasses' },
+  { id: 'visor', name: 'Visor', price: 130, slot: 'glasses' },
+];
+
+const SHOP = { color: COLORS, hat: HATS, glasses: GLASSES };
 
 const STORAGE = {
   coins: 'echo_coins',
-  color: 'echo_color',
-  colors: 'echo_colors',
+  color: 'echo_ghost_color',
+  colors: 'echo_ghost_colors',
+  hat: 'echo_hat',
+  hats: 'echo_hats',
+  glasses: 'echo_glasses',
+  glassesOwned: 'echo_glasses_owned',
   bestScore: 'echo_best_score',
   bestRound: 'echo_best_round',
   games: 'echo_games',
@@ -82,15 +104,19 @@ const AudioEngine = {
 };
 
 const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+let ctx = canvas.getContext('2d');
 const view = { w: 480, h: 800, dpr: 1 };
 
 let gameState = 'MENU';
 let score = 0;
 let coins = 0;
 let currentRound = 1;
-let activeColor = CATALOG[0].id;
-let unlockedColors = [CATALOG[0].id];
+let echoColor = COLORS[0].id;
+let unlockedColors = [COLORS[0].id];
+let echoHat = 'none';
+let unlockedHats = ['none'];
+let echoGlasses = 'none';
+let unlockedGlasses = ['none'];
 let bestScore = 0;
 let bestRound = 0;
 let gamesPlayed = 0;
@@ -133,12 +159,27 @@ function storageSet(key, value) {
   }
 }
 
+function loadSlot(listKey, activeKey, catalog) {
+  const ids = catalog.map((item) => item.id);
+  const unlocked = sanitizeUnlocks(safeJson(storageGet(listKey), [ids[0]]), ids);
+  const saved = storageGet(activeKey);
+  return {
+    unlocked,
+    active: unlocked.includes(saved) ? saved : ids[0],
+  };
+}
+
 function loadSave() {
-  const ids = CATALOG.map((item) => item.id);
   coins = clampInt(storageGet(STORAGE.coins), 0);
-  unlockedColors = sanitizeUnlocks(safeJson(storageGet(STORAGE.colors), [ids[0]]), ids);
-  const savedColor = storageGet(STORAGE.color);
-  activeColor = unlockedColors.includes(savedColor) ? savedColor : unlockedColors[0];
+  const color = loadSlot(STORAGE.colors, STORAGE.color, COLORS);
+  const hat = loadSlot(STORAGE.hats, STORAGE.hat, HATS);
+  const glasses = loadSlot(STORAGE.glassesOwned, STORAGE.glasses, GLASSES);
+  unlockedColors = color.unlocked;
+  echoColor = color.active;
+  unlockedHats = hat.unlocked;
+  echoHat = hat.active;
+  unlockedGlasses = glasses.unlocked;
+  echoGlasses = glasses.active;
   bestScore = clampInt(storageGet(STORAGE.bestScore), 0);
   bestRound = clampInt(storageGet(STORAGE.bestRound), 0);
   gamesPlayed = clampInt(storageGet(STORAGE.games), 0);
@@ -146,11 +187,33 @@ function loadSave() {
 
 function saveAll() {
   storageSet(STORAGE.coins, coins);
-  storageSet(STORAGE.color, activeColor);
+  storageSet(STORAGE.color, echoColor);
   storageSet(STORAGE.colors, JSON.stringify(unlockedColors));
+  storageSet(STORAGE.hat, echoHat);
+  storageSet(STORAGE.hats, JSON.stringify(unlockedHats));
+  storageSet(STORAGE.glasses, echoGlasses);
+  storageSet(STORAGE.glassesOwned, JSON.stringify(unlockedGlasses));
   storageSet(STORAGE.bestScore, bestScore);
   storageSet(STORAGE.bestRound, bestRound);
   storageSet(STORAGE.games, gamesPlayed);
+}
+
+function cosmeticLoadout() {
+  return {
+    coins,
+    unlocked: { color: unlockedColors, hat: unlockedHats, glasses: unlockedGlasses },
+    active: { color: echoColor, hat: echoHat, glasses: echoGlasses },
+  };
+}
+
+function applyLoadout(next) {
+  coins = next.coins;
+  unlockedColors = next.unlocked.color;
+  unlockedHats = next.unlocked.hat;
+  unlockedGlasses = next.unlocked.glasses;
+  echoColor = next.active.color;
+  echoHat = next.active.hat;
+  echoGlasses = next.active.glasses;
 }
 
 function resizeCanvas() {
@@ -234,23 +297,45 @@ function renderProfile() {
   }
 }
 
+function paintOn(target, fn) {
+  const previous = ctx;
+  ctx = target;
+  try {
+    fn();
+  } finally {
+    ctx = previous;
+  }
+}
+
 function renderShop() {
   syncHUD();
   renderProfile();
-  const container = document.getElementById('color-shop');
-  container.replaceChildren();
+  renderSlot('color-shop', 'color');
+  renderSlot('hat-shop', 'hat');
+  renderSlot('glasses-shop', 'glasses');
+  renderPreview();
+}
 
-  for (const item of CATALOG) {
-    const unlocked = unlockedColors.includes(item.id);
-    const selected = activeColor === item.id;
+function renderSlot(containerId, slot) {
+  const container = document.getElementById(containerId);
+  const loadout = cosmeticLoadout();
+  container.replaceChildren();
+  for (const item of SHOP[slot]) {
+    const unlocked = loadout.unlocked[slot].includes(item.id);
+    const selected = loadout.active[slot] === item.id;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `shop-item${selected ? ' selected' : ''}`;
     button.setAttribute('aria-pressed', selected ? 'true' : 'false');
 
-    const swatch = document.createElement('span');
-    swatch.className = 'swatch';
-    swatch.style.background = item.id;
+    if (slot === 'color') {
+      const swatch = document.createElement('span');
+      swatch.className = 'swatch';
+      swatch.style.background = item.id;
+      button.append(swatch);
+    } else {
+      button.append(makeThumb(item));
+    }
 
     const name = document.createElement('span');
     name.className = 'shop-name';
@@ -260,10 +345,50 @@ function renderShop() {
     meta.className = 'shop-meta';
     meta.textContent = selected ? 'Equipped' : unlocked ? 'Owned' : `${item.price} coins`;
 
-    button.append(swatch, name, meta);
-    button.addEventListener('click', () => buyColor(item));
+    button.append(name, meta);
+    button.addEventListener('click', () => buyCosmetic(item));
     container.append(button);
   }
+}
+
+function makeThumb(item) {
+  const thumb = document.createElement('canvas');
+  thumb.className = 'thumb';
+  thumb.width = 112;
+  thumb.height = 80;
+  const g = thumb.getContext('2d');
+  g.setTransform(2, 0, 0, 2, 0, 0);
+  paintOn(g, () => {
+    ctx.translate(28, item.slot === 'hat' ? 30 : 22);
+    if (item.slot === 'hat') drawHat(item.id, 15, '#ff2a55');
+    else drawGlasses(item.id, 16);
+  });
+  return thumb;
+}
+
+function renderPreview() {
+  const preview = document.getElementById('loadout-preview');
+  if (!preview) return;
+  const g = preview.getContext('2d');
+  const width = 180;
+  const height = 168;
+  const dpr = 2;
+  if (preview.width !== width * dpr) {
+    preview.width = width * dpr;
+    preview.height = height * dpr;
+  }
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, width, height);
+  paintOn(g, () => {
+    drawSpirit(width / 2, height * 0.62, {
+      color: echoColor,
+      radius: 28,
+      phase: performance.now() / 180,
+      hollow: true,
+      hat: echoHat,
+      glasses: echoGlasses,
+    });
+  });
 }
 
 function showToast(message) {
@@ -393,20 +518,15 @@ function closeShop() {
   syncMenu();
 }
 
-function buyColor(item) {
-  const result = resolvePurchase(
-    { coins, unlocked: unlockedColors, active: activeColor },
-    item,
-  );
+function buyCosmetic(item) {
+  const result = applyCosmetic(cosmeticLoadout(), item);
   if (result.status === 'broke') {
     AudioEngine.deny();
     showToast('Not enough coins');
     return;
   }
 
-  coins = result.coins;
-  unlockedColors = result.unlocked;
-  activeColor = result.active;
+  applyLoadout(result);
   saveAll();
   if (result.status === 'bought') {
     AudioEngine.coin();
@@ -504,7 +624,7 @@ function movePlayer() {
       vx: -player.vx * 0.15 + (Math.random() - 0.5) * 0.4,
       vy: -player.vy * 0.15 - 0.25,
       life: 14,
-      color: activeColor,
+      color: Math.random() < 0.45 ? '#fff1c2' : '#ff6a00',
     });
   }
 }
@@ -569,8 +689,8 @@ function gameOver() {
   setText('final-best', `Best: ${bestScore} pts · Round ${bestRound}`);
   setMode('GAMEOVER');
   showScreen('game-over-screen');
-  burst(player.x, player.y, activeColor);
-  burst(player.x, player.y, '#ff2a55');
+  burst(player.x, player.y, '#fff1c2');
+  burst(player.x, player.y, '#ff4d00');
   announce(`You lost. ${summary}`);
 }
 
@@ -665,6 +785,262 @@ function drawRibbon(points, color, width, alpha) {
   ctx.restore();
 }
 
+function flameTongue(angle, length, width) {
+  const px = Math.cos(angle);
+  const py = Math.sin(angle);
+  const nx = -py;
+  const ny = px;
+  const mid = length * 0.48;
+  ctx.beginPath();
+  ctx.moveTo(nx * width * 0.22, ny * width * 0.22);
+  ctx.quadraticCurveTo(px * mid + nx * width, py * mid + ny * width, px * length, py * length);
+  ctx.quadraticCurveTo(px * mid - nx * width, py * mid - ny * width, -nx * width * 0.22, -ny * width * 0.22);
+  ctx.closePath();
+}
+
+function drawFireball(x, y, radius, phase, alpha, heading = null) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.globalAlpha = alpha;
+  const boiling = heading == null;
+
+  const heat = ctx.createRadialGradient(0, radius * 0.08, radius * 0.1, 0, 0, radius * 2.8);
+  heat.addColorStop(0, 'rgba(255, 244, 210, 0.95)');
+  heat.addColorStop(0.22, 'rgba(255, 150, 30, 0.55)');
+  heat.addColorStop(0.55, 'rgba(255, 40, 0, 0.18)');
+  heat.addColorStop(1, 'rgba(90, 0, 0, 0)');
+  ctx.fillStyle = heat;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 2.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  for (let i = 0; i < 14; i += 1) {
+    const flicker = Math.sin(phase * 3.6 + i * 1.55) * 0.28;
+    const around = (i / 14) * Math.PI * 2 + flicker;
+    const angle = boiling ? around : heading + (i / 13 - 0.5) * 2.2 + flicker * 0.7;
+    const reach = boiling ? 1.05 : 1.65;
+    const length = radius * (reach + Math.sin(phase * 4.8 + i * 1.1) * 0.48 + (i % 3 === 0 ? 0.38 : 0));
+    const width = radius * (0.42 + (i % 2) * 0.14);
+    const hot = i % 3 !== 1;
+    const tongue = ctx.createLinearGradient(0, 0, Math.cos(angle) * length, Math.sin(angle) * length);
+    tongue.addColorStop(0, hot ? 'rgba(255, 250, 220, 0.98)' : 'rgba(255, 186, 48, 0.95)');
+    tongue.addColorStop(0.4, hot ? 'rgba(255, 110, 0, 0.9)' : 'rgba(255, 42, 0, 0.8)');
+    tongue.addColorStop(1, 'rgba(120, 6, 0, 0)');
+    ctx.fillStyle = tongue;
+    flameTongue(angle, length, width);
+    ctx.fill();
+  }
+
+  ctx.beginPath();
+  for (let i = 0; i <= 28; i += 1) {
+    const angle = (i / 28) * Math.PI * 2;
+    const boil = 1 + Math.sin(phase * 5.2 + i * 1.15) * 0.18 + Math.sin(phase * 2.4 + i * 0.6) * 0.07;
+    const px = Math.cos(angle) * radius * boil;
+    const py = Math.sin(angle) * radius * boil * 0.94;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  const body = ctx.createRadialGradient(-radius * 0.2, -radius * 0.24, radius * 0.04, 0, radius * 0.08, radius * 1.05);
+  body.addColorStop(0, '#ffffff');
+  body.addColorStop(0.22, '#fff4c4');
+  body.addColorStop(0.5, '#ffb000');
+  body.addColorStop(0.78, '#ff4a00');
+  body.addColorStop(1, 'rgba(120, 10, 0, 0.2)');
+  ctx.fillStyle = body;
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(255, 255, 245, 0.96)';
+  ctx.beginPath();
+  ctx.arc(-radius * 0.08, -radius * 0.1, radius * 0.38, 0, Math.PI * 2);
+  ctx.fill();
+
+  for (let i = 0; i < 8; i += 1) {
+    const life = (phase * 0.18 + i / 8) % 1;
+    const drift = boiling ? (i / 8) * Math.PI * 2 : heading + (i - 3.5) * 0.28;
+    const angle = drift + Math.sin(phase + i) * 0.2;
+    const dist = radius * (0.4 + life * 2.5);
+    ctx.globalAlpha = alpha * (1 - life) * 0.95;
+    ctx.fillStyle = life < 0.3 ? '#fff8e4' : '#ff5a14';
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist, 1.2 + (1 - life) * 2.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawFireTrail(points) {
+  if (points.length < 2) return;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(255, 48, 0, 0.28)';
+  ctx.lineWidth = 18;
+  strokePath(points);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255, 122, 16, 0.78)';
+  ctx.lineWidth = 8;
+  strokePath(points);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255, 236, 176, 0.9)';
+  ctx.lineWidth = 2.6;
+  strokePath(points);
+  ctx.stroke();
+
+  const start = Math.max(0, points.length - 14);
+  const wobble = performance.now() / 70;
+  for (let i = start; i < points.length; i += 1) {
+    const t = (i - start) / 14;
+    ctx.globalAlpha = 0.2 + t * 0.65;
+    ctx.fillStyle = t > 0.72 ? '#fff3c8' : '#ff5310';
+    ctx.beginPath();
+    ctx.arc(
+      points[i].x,
+      points[i].y + Math.sin(wobble + i) * 1.6,
+      2.4 + t * 5.5,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawHat(kind, radius, accent) {
+  if (!kind || kind === 'none') {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(0, -radius * 0.15, radius * 0.42, 0, Math.PI * 2);
+    ctx.moveTo(-radius * 0.28, radius * 0.12);
+    ctx.lineTo(radius * 0.28, -radius * 0.42);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  const r = radius;
+  ctx.save();
+  if (kind === 'cap') {
+    ctx.fillStyle = '#162033';
+    ctx.beginPath();
+    ctx.ellipse(0, -r * 0.95, r * 0.72, r * 0.48, 0, Math.PI, 0, true);
+    ctx.fill();
+    ctx.fillStyle = accent || '#ff2a55';
+    ctx.fillRect(-r * 0.7, -r * 0.98, r * 1.4, r * 0.08);
+    ctx.fillStyle = '#162033';
+    ctx.beginPath();
+    ctx.ellipse(r * 0.55, -r * 0.62, r * 0.5, r * 0.13, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (kind === 'beanie') {
+    ctx.fillStyle = '#6d28d9';
+    ctx.beginPath();
+    ctx.ellipse(0, -r * 0.82, r * 0.78, r * 0.58, 0, Math.PI, 0, true);
+    ctx.lineTo(r * 0.78, -r * 0.62);
+    ctx.quadraticCurveTo(0, -r * 0.38, -r * 0.78, -r * 0.62);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#ddd6fe';
+    ctx.fillRect(-r * 0.78, -r * 0.72, r * 1.56, r * 0.14);
+    ctx.fillStyle = '#f9a8d4';
+    ctx.beginPath();
+    ctx.arc(0, -r * 1.38, r * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (kind === 'tophat') {
+    ctx.fillStyle = '#12141c';
+    ctx.fillRect(-r * 0.4, -r * 1.95, r * 0.8, r * 0.95);
+    ctx.beginPath();
+    ctx.ellipse(0, -r * 1.02, r * 0.9, r * 0.16, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff2a55';
+    ctx.fillRect(-r * 0.4, -r * 1.18, r * 0.8, r * 0.12);
+  } else if (kind === 'crown') {
+    ctx.fillStyle = '#f6c445';
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.72, -r * 0.55);
+    ctx.lineTo(-r * 0.72, -r * 1.2);
+    ctx.lineTo(-r * 0.36, -r * 0.78);
+    ctx.lineTo(0, -r * 1.48);
+    ctx.lineTo(r * 0.36, -r * 0.78);
+    ctx.lineTo(r * 0.72, -r * 1.2);
+    ctx.lineTo(r * 0.72, -r * 0.55);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.72, r * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff2a55';
+    ctx.beginPath();
+    ctx.arc(-r * 0.36, -r * 0.66, r * 0.06, 0, Math.PI * 2);
+    ctx.arc(r * 0.36, -r * 0.66, r * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawGlasses(kind, radius) {
+  if (!kind || kind === 'none') {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.38, 0, Math.PI * 2);
+    ctx.moveTo(-radius * 0.26, radius * 0.26);
+    ctx.lineTo(radius * 0.26, -radius * 0.26);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  const r = radius;
+  const eyeY = -r * 0.18;
+  ctx.save();
+  if (kind === 'rounds') {
+    ctx.strokeStyle = '#f4efe2';
+    ctx.lineWidth = Math.max(1.4, r * 0.08);
+    ctx.beginPath();
+    ctx.arc(-r * 0.32, eyeY, r * 0.28, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(r * 0.3, eyeY, r * 0.28, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.04, eyeY);
+    ctx.lineTo(r * 0.02, eyeY);
+    ctx.moveTo(-r * 0.58, eyeY);
+    ctx.lineTo(-r * 0.82, eyeY - r * 0.04);
+    ctx.moveTo(r * 0.56, eyeY);
+    ctx.lineTo(r * 0.82, eyeY - r * 0.04);
+    ctx.stroke();
+  } else if (kind === 'shades') {
+    ctx.fillStyle = 'rgba(8, 10, 18, 0.92)';
+    roundBox(-r * 0.62, eyeY - r * 0.22, r * 0.52, r * 0.4, r * 0.08);
+    roundBox(r * 0.08, eyeY - r * 0.22, r * 0.52, r * 0.4, r * 0.08);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(-r * 0.1, eyeY - r * 0.04, r * 0.2, r * 0.08);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.46, eyeY - r * 0.08, r * 0.08, r * 0.05, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (kind === 'visor') {
+    ctx.fillStyle = 'rgba(0, 240, 255, 0.38)';
+    ctx.strokeStyle = '#d8fbff';
+    ctx.lineWidth = 1.3;
+    roundBox(-r * 0.78, eyeY - r * 0.2, r * 1.56, r * 0.38, r * 0.12);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function roundBox(x, y, width, height, radius) {
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y, width, height, radius);
+  else ctx.rect(x, y, width, height);
+  ctx.fill();
+}
+
 function traceGhost(radius, phase) {
   const wave = (index) => Math.sin(phase * 2.4 + index) * radius * 0.18;
   ctx.beginPath();
@@ -710,9 +1086,9 @@ function drawSpirit(x, y, options) {
   traceGhost(radius, phase);
   const body = ctx.createLinearGradient(0, -radius * 1.2, 0, radius);
   if (hollow) {
-    body.addColorStop(0, 'rgba(255, 236, 244, 0.55)');
-    body.addColorStop(0.42, hexAlpha(color, 0.42));
-    body.addColorStop(1, hexAlpha(color, 0.08));
+    body.addColorStop(0, 'rgba(255, 255, 255, 0.78)');
+    body.addColorStop(0.42, hexAlpha(color, 0.62));
+    body.addColorStop(1, hexAlpha(color, 0.1));
   } else {
     body.addColorStop(0, 'rgba(255, 255, 255, 0.92)');
     body.addColorStop(0.38, hexAlpha(color, 0.95));
@@ -751,6 +1127,9 @@ function drawSpirit(x, y, options) {
     ctx.fill();
   }
 
+  if (options.glasses && options.glasses !== 'none') drawGlasses(options.glasses, radius);
+  if (options.hat && options.hat !== 'none') drawHat(options.hat, radius, color);
+
   if (aura) {
     for (let spark = 0; spark < 3; spark += 1) {
       const rise = (phase * 0.15 + spark / 3) % 1;
@@ -787,8 +1166,8 @@ function drawAfterimages(path, index, color, hollow) {
 
 function drawEchoes() {
   echoes.forEach((echo, index) => {
-    const alpha = Math.min(0.7, 0.18 + ((index + 1) / echoes.length) * 0.5);
-    drawRibbon(echo, '#ff2a55', 2.2, alpha);
+    const alpha = Math.min(0.7, 0.18 + ((index + 1) / echoes.length) * 0.45);
+    drawRibbon(echo, echoColor, 2.2, alpha);
   });
 
   echoes.forEach((echo, index) => {
@@ -798,14 +1177,16 @@ function drawEchoes() {
     const previous = echo[Math.max(0, frameIndex - 2)];
     const lean = clamp(ghost.x - previous.x, -8, 8) / 8 * 0.55;
     const newest = index === echoes.length - 1;
-    drawAfterimages(echo, frameIndex, newest ? '#ff2a55' : '#9d1744', true);
+    drawAfterimages(echo, frameIndex, echoColor, true);
     drawSpirit(ghost.x, ghost.y, {
-      color: newest ? '#ff2a55' : '#c81e4a',
+      color: echoColor,
       radius: 17,
-      alpha: newest ? 0.92 : 0.62,
+      alpha: newest ? 0.94 : 0.58,
       phase: performance.now() / 190 + index * 1.3,
       lean,
       hollow: true,
+      hat: echoHat,
+      glasses: echoGlasses,
     });
   });
 }
@@ -877,21 +1258,18 @@ function drawBonusIcon(x, y) {
   ctx.restore();
 }
 
+function fireHeading() {
+  const speed = Math.hypot(player.vx, player.vy);
+  if (speed < 0.35) return -Math.PI / 2;
+  return Math.atan2(-player.vy, -player.vx);
+}
+
 function drawPlayer() {
-  const phase = performance.now() / 170;
+  const phase = performance.now() / 90;
   const flickering = grace > 0 && Math.floor(grace / 4) % 2 === 0;
-  const lean = clamp(player.vx, -5, 5) / 5 * 0.5;
-  if (currentPath.length > 1) {
-    drawAfterimages(currentPath, currentPath.length - 1, activeColor, false);
-  }
-  drawSpirit(player.x, player.y, {
-    color: activeColor,
-    radius: 18,
-    alpha: flickering ? 0.42 : 1,
-    phase,
-    lean,
-    hollow: false,
-  });
+  if (currentPath.length > 1) drawFireTrail(currentPath);
+  const speed = Math.hypot(player.vx, player.vy);
+  drawFireball(player.x, player.y, 20, phase, flickering ? 0.45 : 1, speed < 0.35 ? null : fireHeading());
 
   if (activePowerup !== 'SHIELD' && grace <= 0) return;
   ctx.save();
@@ -979,15 +1357,22 @@ function drawMenuBackdrop() {
     2,
     0.35,
   );
-  drawSpirit(
-    cx + Math.cos(time + 2.2) * 86,
-    cy + Math.sin(time + 2.2) * 36,
-    { color: '#ff2a55', radius: 18, phase: time * 3, lean: Math.cos(time) * 0.3, hollow: true },
-  );
-  drawSpirit(
+  drawSpirit(cx + Math.cos(time + 2.2) * 86, cy + Math.sin(time + 2.2) * 36, {
+    color: echoColor,
+    radius: 18,
+    phase: time * 3,
+    lean: Math.cos(time) * 0.3,
+    hollow: true,
+    hat: echoHat,
+    glasses: echoGlasses,
+  });
+  drawFireball(
     cx + Math.cos(time) * 86,
     cy + Math.sin(time) * 36,
-    { color: activeColor, radius: 18, phase: time * 3.2, lean: -Math.sin(time) * 0.3, hollow: false },
+    18,
+    time * 6,
+    1,
+    Math.atan2(-Math.cos(time) * 36, Math.sin(time) * 86),
   );
 }
 
@@ -1009,7 +1394,6 @@ function draw() {
     drawMenuBackdrop();
   } else {
     drawEchoes();
-    drawRibbon(currentPath, activeColor, 2.4, 0.55);
     drawPickups();
     drawParticles();
     drawPlayer();
@@ -1042,6 +1426,7 @@ function frame(now) {
   }
   if (steps === 5) accumulator = 0;
   draw();
+  if (!document.getElementById('shop-screen').classList.contains('hidden')) renderPreview();
   requestAnimationFrame(frame);
 }
 
@@ -1120,7 +1505,7 @@ if (import.meta.env.DEV) {
     openShop,
     closeShop,
     returnToMenu,
-    buyColor,
+    buyCosmetic,
     placePlayer(x, y) {
       player.x = x;
       player.y = y;
@@ -1154,8 +1539,12 @@ if (import.meta.env.DEV) {
       grace,
       roundFrame,
       player: { x: player.x, y: player.y, targetX: player.targetX, targetY: player.targetY, radius: player.radius },
-      activeColor,
+      echoColor,
+      echoHat,
+      echoGlasses,
       unlockedColors: [...unlockedColors],
+      unlockedHats: [...unlockedHats],
+      unlockedGlasses: [...unlockedGlasses],
       bestScore,
       bestRound,
       gamesPlayed,

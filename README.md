@@ -1,6 +1,6 @@
 # Echo
 
-A one-screen arcade game. You drag yourself around a dark arena, grab three coins to finish a round, and then your route comes back as an echo. Later rounds play every previous route at the same time. Coins stay in the shop between runs and unlock player colors.
+A one-screen arcade game. You drag a fireball around a dark arena, grab three coins to finish a round, and then your route comes back as an echo. Later rounds play every previous route at the same time. Coins stay in the shop between runs and dress the echoes.
 
 The interface is in English.
 
@@ -20,11 +20,11 @@ npm run build
 
 ## How to play
 
-- Drag the spirit, or use the arrow keys / WASD.
+- Drag the fireball, or use the arrow keys / WASD.
 - Collect three coins to seal the round. The path you just drew becomes a ghost.
 - You are safe for a short moment when a new echo wakes up, and for a moment after a shield ends.
 - Cyan shields block a hit for about five seconds. Gold `+` pickups add 5 coins and 25 points without cancelling a shield.
-- Colors you buy are saved in this browser.
+- Shop colors, hats, and glasses dress the echoes that chase you. One of each can be worn at the same time. You stay a fireball.
 
 ## Fixes from the first draft
 
