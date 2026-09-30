@@ -4,7 +4,9 @@ import {
   applyCosmetic,
   ghostPoint,
   hitsEcho,
+  joystickVector,
   pickSpawn,
+  previewLoadout,
   resolvePurchase,
   safeJson,
   sanitizeUnlocks,
@@ -103,6 +105,27 @@ test('a color, a hat, and glasses equip together', () => {
   assert.equal(recolored.active.glasses, 'shades');
   assert.deepEqual(recolored.unlocked.hat, ['none', 'cap']);
   assert.deepEqual(recolored.unlocked.glasses, ['none', 'shades']);
+});
+
+test('a shop preview stacks try-ons and lets a hover replace one slot', () => {
+  const equipped = { color: '#ff2a55', hat: 'none', glasses: 'none' };
+  const pinned = previewLoadout(equipped, { color: '#b388ff', hat: 'crown', glasses: null }, null);
+  assert.deepEqual(pinned, { color: '#b388ff', hat: 'crown', glasses: 'none' });
+  const hovered = previewLoadout(equipped, { hat: 'crown' }, { slot: 'color', id: '#00f0ff' });
+  assert.equal(hovered.color, '#00f0ff');
+  assert.equal(hovered.hat, 'crown');
+  assert.equal(hovered.glasses, 'none');
+});
+
+test('the joystick clamps to its radius and keeps direction', () => {
+  assert.deepEqual(joystickVector(0, 0, 56), { x: 0, y: 0, amount: 0 });
+  const inside = joystickVector(0, 28, 56);
+  assert.equal(inside.amount, 0.5);
+  assert.ok(Math.abs(inside.y - 0.5) < 1e-9);
+  const outside = joystickVector(-112, 0, 56);
+  assert.equal(outside.amount, 1);
+  assert.ok(Math.abs(outside.x + 1) < 1e-9);
+  assert.equal(outside.y, 0);
 });
 
 test('spawns stay away from the player when the field has room', () => {

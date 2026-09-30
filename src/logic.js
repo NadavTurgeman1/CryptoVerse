@@ -118,6 +118,35 @@ export function resolvePurchase(state, item) {
   };
 }
 
+/**
+ * The echo preview wears pinned try-ons, with a hover replacing only its slot.
+ * Equipped ids fill any slot that is not being tried.
+ */
+export function previewLoadout(equipped, pinned, hover) {
+  const look = {
+    color: equipped.color,
+    hat: equipped.hat,
+    glasses: equipped.glasses,
+  };
+  for (const slot of ['color', 'hat', 'glasses']) {
+    if (pinned?.[slot]) look[slot] = pinned[slot];
+  }
+  if (hover?.slot && hover.id) look[hover.slot] = hover.id;
+  return look;
+}
+
+/** Stick deflection clamped to a radius. `amount` is 0 at rest and 1 at the edge. */
+export function joystickVector(dx, dy, radius) {
+  const distance = Math.hypot(dx, dy);
+  if (!(distance > 0) || !(radius > 0)) return { x: 0, y: 0, amount: 0 };
+  const amount = Math.min(1, distance / radius);
+  return {
+    x: (dx / distance) * amount,
+    y: (dy / distance) * amount,
+    amount,
+  };
+}
+
 /** Equip one shop slot without clearing the others, so a color, hat, and glasses can be worn together. */
 export function applyCosmetic(loadout, item) {
   const result = resolvePurchase({

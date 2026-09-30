@@ -20,7 +20,8 @@ npm run build
 
 ## How to play
 
-- Drag the fireball, or use the arrow keys / WASD.
+- Drag the fireball, or use the arrow keys / WASD. On a phone, hold anywhere and tilt the floating stick.
+- In the shop, tap an item to see it on an echo before you buy it. Color, hat, and glasses can be previewed together.
 - Collect three coins to seal the round. The path you just drew becomes a ghost.
 - You are safe for a short moment when a new echo wakes up, and for a moment after a shield ends.
 - Cyan shields block a hit for about five seconds. Gold `+` pickups add 5 coins and 25 points without cancelling a shield.

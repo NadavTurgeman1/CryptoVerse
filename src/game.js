@@ -4,7 +4,9 @@ import {
   clampInt,
   ghostPoint,
   hitsEcho,
+  joystickVector,
   pickSpawn,
+  previewLoadout,
   safeJson,
   sanitizeUnlocks,
   sealPath,
@@ -35,6 +37,9 @@ const GLASSES = [
 ];
 
 const SHOP = { color: COLORS, hat: HATS, glasses: GLASSES };
+const COIN_RADIUS = 12;
+const JOYSTICK_RADIUS = 56;
+const JOYSTICK_DEADZONE = 0.16;
 
 const STORAGE = {
   coins: 'echo_coins',
@@ -136,6 +141,18 @@ let bannerText = '';
 let bannerTimer = 0;
 let shake = 0;
 let isDragging = false;
+const joystick = {
+  active: false,
+  pointerId: null,
+  ox: 0,
+  oy: 0,
+  x: 0,
+  y: 0,
+  amount: 0,
+};
+const pinnedTry = { color: null, hat: null, glasses: null };
+let hoverTry = null;
+let lastTry = null;
 let toastTimer = 0;
 let lastTime = 0;
 let accumulator = 0;
@@ -231,9 +248,21 @@ function clampToField(value, min, max) {
   return clamp(value, min, max);
 }
 
+function clearJoystick() {
+  joystick.active = false;
+  joystick.pointerId = null;
+  joystick.x = 0;
+  joystick.y = 0;
+  joystick.amount = 0;
+}
+
 function setMode(mode) {
   gameState = mode;
   document.getElementById('game-container').dataset.state = mode;
+  if (mode !== 'PLAYING') {
+    isDragging = false;
+    clearJoystick();
+  }
 }
 
 function hideScreens() {
@@ -307,12 +336,116 @@ function paintOn(target, fn) {
   }
 }
 
+function resetTryOn() {
+  pinnedTry.color = null;
+  pinnedTry.hat = null;
+  pinnedTry.glasses = null;
+  hoverTry = null;
+  lastTry = null;
+}
+
+function catalogItem(slot, id) {
+  return SHOP[slot]?.find((item) => item.id === id) ?? null;
+}
+
+function isTrying(slot, id) {
+  if (hoverTry?.slot === slot && hoverTry.id === id) return true;
+  return pinnedTry[slot] === id;
+}
+
+function setHoverTry(slot, id) {
+  hoverTry = { slot, id };
+  refreshTryMarks();
+  syncTryAction();
+}
+
+function clearHoverTry(slot, id) {
+  if (hoverTry?.slot !== slot || hoverTry.id !== id) return;
+  hoverTry = null;
+  refreshTryMarks();
+  syncTryAction();
+}
+
+function pinTry(item) {
+  if (pinnedTry[item.slot] === item.id) pinnedTry[item.slot] = null;
+  else pinnedTry[item.slot] = item.id;
+  lastTry = pinnedTry[item.slot] ? { slot: item.slot, id: item.id } : nextPinnedTry();
+  hoverTry = null;
+  renderShop();
+}
+
+function nextPinnedTry() {
+  for (const slot of ['glasses', 'hat', 'color']) {
+    if (pinnedTry[slot]) return { slot, id: pinnedTry[slot] };
+  }
+  return null;
+}
+
+function actionItem() {
+  const loadout = cosmeticLoadout();
+  const candidates = [];
+  if (lastTry) candidates.push(lastTry);
+  for (const slot of ['glasses', 'hat', 'color']) {
+    if (pinnedTry[slot]) candidates.push({ slot, id: pinnedTry[slot] });
+  }
+  for (const trial of candidates) {
+    const item = catalogItem(trial.slot, trial.id);
+    if (item && loadout.active[trial.slot] !== item.id) return item;
+  }
+  return null;
+}
+
+function refreshTryMarks() {
+  document.querySelectorAll('.shop-item').forEach((button) => {
+    button.classList.toggle('trying', isTrying(button.dataset.slot, button.dataset.id));
+  });
+}
+
+function syncTryAction() {
+  const caption = document.getElementById('try-on-caption');
+  const button = document.getElementById('try-on-buy');
+  if (!caption || !button) return;
+  const item = actionItem();
+  const look = previewLoadout(
+    { color: echoColor, hat: echoHat, glasses: echoGlasses },
+    pinnedTry,
+    hoverTry,
+  );
+  const names = ['color', 'hat', 'glasses'].flatMap((slot) => {
+    const equipped = slot === 'color' ? echoColor : slot === 'hat' ? echoHat : echoGlasses;
+    if (look[slot] === equipped) return [];
+    const tried = catalogItem(slot, look[slot]);
+    return tried ? [tried.name] : [];
+  });
+  caption.textContent = names.length
+    ? `Preview: ${names.join(', ')}`
+    : 'Tap an item to preview it on an echo';
+  if (!item) {
+    button.hidden = true;
+    button.disabled = false;
+    return;
+  }
+  const unlocked = cosmeticLoadout().unlocked[item.slot].includes(item.id);
+  button.hidden = false;
+  if (unlocked) {
+    button.disabled = false;
+    button.textContent = `Equip ${item.name}`;
+  } else if (coins >= item.price) {
+    button.disabled = false;
+    button.textContent = `Buy ${item.name} · ${item.price}`;
+  } else {
+    button.disabled = true;
+    button.textContent = `Need ${item.price} coins`;
+  }
+}
+
 function renderShop() {
   syncHUD();
   renderProfile();
   renderSlot('color-shop', 'color');
   renderSlot('hat-shop', 'hat');
   renderSlot('glasses-shop', 'glasses');
+  syncTryAction();
   renderPreview();
 }
 
@@ -325,8 +458,10 @@ function renderSlot(containerId, slot) {
     const selected = loadout.active[slot] === item.id;
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `shop-item${selected ? ' selected' : ''}`;
-    button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    button.className = `shop-item${selected ? ' selected' : ''}${isTrying(slot, item.id) ? ' trying' : ''}`;
+    button.dataset.slot = slot;
+    button.dataset.id = item.id;
+    button.setAttribute('aria-pressed', isTrying(slot, item.id) ? 'true' : 'false');
 
     if (slot === 'color') {
       const swatch = document.createElement('span');
@@ -346,7 +481,14 @@ function renderSlot(containerId, slot) {
     meta.textContent = selected ? 'Equipped' : unlocked ? 'Owned' : `${item.price} coins`;
 
     button.append(name, meta);
-    button.addEventListener('click', () => buyCosmetic(item));
+    button.addEventListener('pointerenter', (event) => {
+      if (event.pointerType === 'touch') return;
+      setHoverTry(slot, item.id);
+    });
+    button.addEventListener('pointerleave', () => clearHoverTry(slot, item.id));
+    button.addEventListener('focus', () => setHoverTry(slot, item.id));
+    button.addEventListener('blur', () => clearHoverTry(slot, item.id));
+    button.addEventListener('click', () => pinTry(item));
     container.append(button);
   }
 }
@@ -379,14 +521,19 @@ function renderPreview() {
   }
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, width, height);
+  const look = previewLoadout(
+    { color: echoColor, hat: echoHat, glasses: echoGlasses },
+    pinnedTry,
+    hoverTry,
+  );
   paintOn(g, () => {
     drawSpirit(width / 2, height * 0.62, {
-      color: echoColor,
+      color: look.color,
       radius: 28,
       phase: performance.now() / 180,
       hollow: true,
-      hat: echoHat,
-      glasses: echoGlasses,
+      hat: look.hat,
+      glasses: look.glasses,
     });
   });
 }
@@ -440,7 +587,7 @@ function spawnCollectibles() {
   collectibles = [];
   for (let i = 0; i < 3; i += 1) {
     const point = spawnPoint();
-    collectibles.push({ x: point.x, y: point.y, radius: 8 });
+    collectibles.push({ x: point.x, y: point.y, radius: COIN_RADIUS });
   }
   if (powerups.length < 2 && Math.random() < 0.4) {
     const point = spawnPoint();
@@ -509,6 +656,7 @@ function returnToMenu() {
 
 function openShop() {
   setMode('MENU');
+  resetTryOn();
   showScreen('shop-screen');
   renderShop();
 }
@@ -523,16 +671,26 @@ function buyCosmetic(item) {
   if (result.status === 'broke') {
     AudioEngine.deny();
     showToast('Not enough coins');
-    return;
+    return false;
   }
 
   applyLoadout(result);
+  if (pinnedTry[item.slot] === item.id) pinnedTry[item.slot] = null;
+  if (lastTry?.slot === item.slot && lastTry.id === item.id) lastTry = nextPinnedTry();
+  if (hoverTry?.slot === item.slot && hoverTry.id === item.id) hoverTry = null;
   saveAll();
   if (result.status === 'bought') {
     AudioEngine.coin();
     showToast(`${item.name} unlocked`);
   }
   renderShop();
+  return true;
+}
+
+function confirmTryOn() {
+  const item = actionItem();
+  if (!item) return;
+  buyCosmetic(item);
 }
 
 function advanceRound() {
@@ -592,7 +750,11 @@ function collectPowerups() {
 }
 
 function movePlayer() {
-  if (!isDragging) {
+  if (joystick.active && joystick.amount > JOYSTICK_DEADZONE) {
+    const lead = (8 / 0.2) * joystick.amount;
+    player.targetX = player.x + (joystick.x / joystick.amount) * lead;
+    player.targetY = player.y + (joystick.y / joystick.amount) * lead;
+  } else if (!isDragging) {
     let dx = 0;
     let dy = 0;
     if (keys.has('ArrowLeft') || keys.has('KeyA')) dx -= 1;
@@ -1191,33 +1353,85 @@ function drawEchoes() {
   });
 }
 
+function drawGoldCoin(x, y, radius) {
+  const r = radius;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+  ctx.beginPath();
+  ctx.ellipse(1, r * 0.9, r * 0.82, r * 0.26, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const glow = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.9);
+  glow.addColorStop(0, 'rgba(255, 214, 90, 0.5)');
+  glow.addColorStop(1, 'rgba(255, 170, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 1.9, 0, Math.PI * 2);
+  ctx.fill();
+
+  const rim = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.15, 0, 0, r);
+  rim.addColorStop(0, '#fff6cf');
+  rim.addColorStop(0.42, '#ffc83a');
+  rim.addColorStop(0.78, '#e09200');
+  rim.addColorStop(1, '#7a3e00');
+  ctx.fillStyle = rim;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(92, 42, 0, 0.55)';
+  ctx.lineWidth = 1;
+  const reed = performance.now() / 900;
+  for (let i = 0; i < 18; i += 1) {
+    const angle = reed + (i / 18) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(angle) * r * 0.8, Math.sin(angle) * r * 0.8);
+    ctx.lineTo(Math.cos(angle) * r * 0.96, Math.sin(angle) * r * 0.96);
+    ctx.stroke();
+  }
+
+  const face = ctx.createRadialGradient(-r * 0.28, -r * 0.32, r * 0.08, 0, 0, r * 0.7);
+  face.addColorStop(0, '#fff8dc');
+  face.addColorStop(0.5, '#ffd35c');
+  face.addColorStop(1, '#c98400');
+  ctx.fillStyle = face;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(122, 62, 0, 0.65)';
+  ctx.lineWidth = Math.max(1.2, r * 0.07);
+  ctx.stroke();
+
+  ctx.fillStyle = '#a86400';
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 0.36);
+  ctx.lineTo(r * 0.24, 0);
+  ctx.lineTo(0, r * 0.36);
+  ctx.lineTo(-r * 0.24, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#fff1b8';
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 0.18);
+  ctx.lineTo(r * 0.1, 0);
+  ctx.lineTo(0, r * 0.18);
+  ctx.lineTo(-r * 0.1, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.28, -r * 0.32, r * 0.22, r * 0.11, -0.7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawPickups() {
   const now = performance.now();
   collectibles.forEach((coin, index) => {
     const bob = Math.sin(now / 220 + index) * 3;
-    const y = coin.y + bob;
-    ctx.save();
-    const glow = ctx.createRadialGradient(coin.x, y, 1, coin.x, y, 18);
-    glow.addColorStop(0, 'rgba(255, 214, 80, 0.55)');
-    glow.addColorStop(1, 'rgba(255, 187, 0, 0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(coin.x, y, 18, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#ffe28a';
-    ctx.beginPath();
-    ctx.arc(coin.x, y, coin.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#ffbb00';
-    ctx.beginPath();
-    ctx.arc(coin.x, y, coin.radius * 0.62, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.arc(coin.x - 2, y - 2, coin.radius * 0.28, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
+    drawGoldCoin(coin.x, coin.y + bob, coin.radius);
   });
 
   for (const power of powerups) {
@@ -1330,6 +1544,27 @@ function drawBanner() {
   ctx.restore();
 }
 
+function drawJoystick() {
+  if (!joystick.active) return;
+  ctx.save();
+  ctx.translate(joystick.ox, joystick.oy);
+  ctx.fillStyle = 'rgba(8, 12, 22, 0.42)';
+  ctx.beginPath();
+  ctx.arc(0, 0, JOYSTICK_RADIUS, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.38)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255, 148, 40, 0.95)';
+  ctx.strokeStyle = 'rgba(255, 236, 190, 0.9)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(joystick.x * JOYSTICK_RADIUS, joystick.y * JOYSTICK_RADIUS, 22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawDragReticle() {
   if (!isDragging || gameState !== 'PLAYING') return;
   ctx.save();
@@ -1398,6 +1633,7 @@ function draw() {
     drawParticles();
     drawPlayer();
     drawDragReticle();
+    drawJoystick();
     drawBanner();
   }
   drawVignette();
@@ -1450,20 +1686,60 @@ function endDrag() {
   isDragging = false;
 }
 
+function updateJoystick(event) {
+  const point = pointFromEvent(event);
+  const vector = joystickVector(point.x - joystick.ox, point.y - joystick.oy, JOYSTICK_RADIUS);
+  joystick.x = vector.x;
+  joystick.y = vector.y;
+  joystick.amount = vector.amount;
+}
+
+function endJoystick(event) {
+  if (!joystick.active) return;
+  if (event && event.pointerId !== joystick.pointerId) return;
+  clearJoystick();
+}
+
 function bindInput() {
   canvas.addEventListener('pointerdown', (event) => {
     if (gameState !== 'PLAYING') return;
-    isDragging = true;
-    canvas.setPointerCapture(event.pointerId);
-    updateTarget(event);
     AudioEngine.unlock();
+    if (event.pointerType === 'touch') {
+      const point = pointFromEvent(event);
+      joystick.active = true;
+      joystick.pointerId = event.pointerId;
+      joystick.ox = point.x;
+      joystick.oy = point.y;
+      joystick.x = 0;
+      joystick.y = 0;
+      joystick.amount = 0;
+      try { canvas.setPointerCapture(event.pointerId); } catch { /* synthetic touches */ }
+      return;
+    }
+    isDragging = true;
+    try { canvas.setPointerCapture(event.pointerId); } catch { /* synthetic pointers */ }
+    updateTarget(event);
   });
   canvas.addEventListener('pointermove', (event) => {
+    if (joystick.active && event.pointerId === joystick.pointerId) {
+      updateJoystick(event);
+      return;
+    }
     if (!isDragging || gameState !== 'PLAYING') return;
     updateTarget(event);
   });
-  window.addEventListener('pointerup', endDrag);
-  window.addEventListener('pointercancel', endDrag);
+  window.addEventListener('pointermove', (event) => {
+    if (!joystick.active || event.pointerId !== joystick.pointerId) return;
+    updateJoystick(event);
+  });
+  window.addEventListener('pointerup', (event) => {
+    endJoystick(event);
+    endDrag();
+  });
+  window.addEventListener('pointercancel', (event) => {
+    endJoystick(event);
+    endDrag();
+  });
 
   window.addEventListener('keydown', (event) => {
     if (!KEY_CODES.has(event.code)) return;
@@ -1476,6 +1752,7 @@ function bindInput() {
   window.addEventListener('blur', () => {
     keys.clear();
     isDragging = false;
+    clearJoystick();
   });
   window.addEventListener('resize', resizeCanvas);
 }
@@ -1486,6 +1763,11 @@ function bindUI() {
   document.getElementById('shop-btn').addEventListener('click', openShop);
   document.getElementById('close-shop').addEventListener('click', closeShop);
   document.getElementById('menu-btn').addEventListener('click', returnToMenu);
+  document.getElementById('try-on-buy').addEventListener('click', confirmTryOn);
+  const coarse = window.matchMedia('(pointer: coarse)').matches;
+  if (coarse) {
+    document.getElementById('controls-hint').textContent = 'Hold anywhere and tilt the stick';
+  }
 }
 
 loadSave();
@@ -1506,6 +1788,16 @@ if (import.meta.env.DEV) {
     closeShop,
     returnToMenu,
     buyCosmetic,
+    confirmTryOn,
+    tryOn: () => ({
+      pinned: { ...pinnedTry },
+      hover: hoverTry ? { ...hoverTry } : null,
+      last: lastTry ? { ...lastTry } : null,
+      caption: document.getElementById('try-on-caption')?.textContent ?? '',
+      buyLabel: document.getElementById('try-on-buy')?.textContent ?? '',
+      buyHidden: document.getElementById('try-on-buy')?.hidden ?? true,
+    }),
+    joystick: () => ({ ...joystick }),
     placePlayer(x, y) {
       player.x = x;
       player.y = y;
@@ -1513,7 +1805,7 @@ if (import.meta.env.DEV) {
       player.targetY = y;
     },
     placeCoins(list) {
-      collectibles = list.map((coin) => ({ radius: 8, ...coin }));
+      collectibles = list.map((coin) => ({ radius: COIN_RADIUS, ...coin }));
     },
     placePowerups(list) {
       powerups = list.map((power) => ({ ...power }));
