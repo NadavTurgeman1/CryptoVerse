@@ -3,8 +3,10 @@ import test from 'node:test';
 import {
   applyCosmetic,
   dropOldestEcho,
+  echoClock,
   ghostPoint,
   hitsEcho,
+  roundPressure,
   stepHoming,
   joystickVector,
   pickSpawn,
@@ -161,6 +163,35 @@ test('a slide moves by the finger delta and does not jump to the finger', () => 
   assert.deepEqual(right, { x: 248, y: 288 });
   const edge = slideBy(450, 20, 40, -20, bounds);
   assert.deepEqual(edge, { x: 466, y: 14 });
+});
+
+test('later rounds speed the echoes up, shorten the grace, and pull coins into a cluster', () => {
+  assert.deepEqual(roundPressure(1), { playback: 100, grace: 75, spacing: 78, reach: Infinity });
+  assert.deepEqual(roundPressure(2), { playback: 110, grace: 69, spacing: 74, reach: 244 });
+  assert.equal(roundPressure(8).playback, 170);
+  assert.equal(roundPressure(8).grace, 36);
+  assert.equal(roundPressure(8).spacing, 52);
+  assert.equal(roundPressure(8).reach, 150);
+  assert.equal(roundPressure(20).playback, 170);
+  assert.equal(echoClock(0, 8), 0);
+  assert.equal(echoClock(10, 1), 10);
+  assert.equal(echoClock(10, 6), 15);
+  assert.equal(echoClock(-4, 6), 0);
+
+  let n = 0;
+  const rand = () => {
+    n += 1;
+    return ((n * 3) % 10) / 10;
+  };
+  const point = pickSpawn(
+    rand,
+    { minX: 0, maxX: 400, minY: 0, maxY: 700 },
+    [{ x: 200, y: 300, minDist: 40 }],
+    { x: 200, y: 300, reach: 120 },
+  );
+  const dist = Math.hypot(point.x - 200, point.y - 300);
+  assert.ok(dist >= 40, `coin landed on the anchor (${dist})`);
+  assert.ok(dist <= 120.5, `coin left the cluster (${dist})`);
 });
 
 test('spawns stay away from the player when the field has room', () => {

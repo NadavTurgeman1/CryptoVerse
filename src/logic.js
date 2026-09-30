@@ -40,6 +40,28 @@ export function ghostPoint(echo, frame) {
   return echo[index];
 }
 
+/**
+ * Later rounds tighten the route you just drew.
+ * Playback is a percent of the recorded speed, grace is frames of safety,
+ * spacing is how far apart coins stay, and reach pulls them toward the first coin.
+ */
+export function roundPressure(round) {
+  const steps = Math.max(0, Math.floor(Number(round)) - 1);
+  const safeSteps = Number.isFinite(steps) ? steps : 0;
+  return {
+    playback: Math.min(170, 100 + safeSteps * 10),
+    grace: Math.max(36, 75 - safeSteps * 6),
+    spacing: Math.max(52, 78 - safeSteps * 4),
+    reach: safeSteps === 0 ? Infinity : Math.max(150, 260 - safeSteps * 16),
+  };
+}
+
+/** Path index for every echo. Round 1 stays on the recorded clock. */
+export function echoClock(frame, round) {
+  const ticks = Math.max(0, Math.floor(Number(frame)) || 0);
+  return Math.floor((ticks * roundPressure(round).playback) / 100);
+}
+
 /** The first sealed route is the oldest echo. Later routes stay in order. */
 export function dropOldestEcho(echoes) {
   if (!Array.isArray(echoes) || echoes.length === 0) {
@@ -104,28 +126,46 @@ export function takeOverlaps(items, x, y, reachFor) {
   return { kept, taken };
 }
 
-export function pickSpawn(rand, bounds, blockers) {
+export function pickSpawn(rand, bounds, blockers, cluster) {
   const spanX = Math.max(0, bounds.maxX - bounds.minX);
   const spanY = Math.max(0, bounds.maxY - bounds.minY);
+  const clustered = cluster && Number.isFinite(cluster.reach);
   let fallback = {
     x: bounds.minX + spanX / 2,
     y: bounds.minY + spanY / 2,
   };
 
   for (let attempt = 0; attempt < 40; attempt += 1) {
-    const point = {
-      x: bounds.minX + rand() * spanX,
-      y: bounds.minY + spanY * rand(),
-    };
+    let point;
+    if (clustered) {
+      const angle = rand() * Math.PI * 2;
+      const dist = rand() * cluster.reach;
+      point = {
+        x: clamp(cluster.x + Math.cos(angle) * dist, bounds.minX, bounds.maxX),
+        y: clamp(cluster.y + Math.sin(angle) * dist, bounds.minY, bounds.maxY),
+      };
+    } else {
+      point = {
+        x: bounds.minX + rand() * spanX,
+        y: bounds.minY + rand() * spanY,
+      };
+    }
     fallback = point;
     const clear = blockers.every((blocker) => {
       const minDist = blocker.minDist ?? 48;
       return Math.hypot(blocker.x - point.x, blocker.y - point.y) >= minDist;
     });
-    if (clear) return point;
+    const inside = !clustered || Math.hypot(point.x - cluster.x, point.y - cluster.y) <= cluster.reach + 0.5;
+    if (clear && inside) return point;
   }
 
-  return fallback;
+  if (!clustered) return fallback;
+  const angle = rand() * Math.PI * 2;
+  const dist = Math.min(cluster.reach, 52);
+  return {
+    x: clamp(cluster.x + Math.cos(angle) * dist, bounds.minX, bounds.maxX),
+    y: clamp(cluster.y + Math.sin(angle) * dist, bounds.minY, bounds.maxY),
+  };
 }
 
 export function resolvePurchase(state, item) {

@@ -3,7 +3,9 @@ import {
   clamp,
   clampInt,
   dropOldestEcho,
+  echoClock,
   ghostPoint,
+  roundPressure,
   stepHoming,
   hitsEcho,
   joystickVector,
@@ -67,7 +69,6 @@ const STORAGE = {
 
 const STEP = 1000 / 60;
 const SHIELD_FRAMES = 300;
-const ROUND_GRACE = 75;
 const SHIELD_END_GRACE = 24;
 const COIN_BONUS = 5;
 const COIN_SCORE = 25;
@@ -578,19 +579,24 @@ function fieldBounds() {
   };
 }
 
+function ghostFrame() {
+  return echoClock(roundFrame, currentRound);
+}
+
 function spawnBlockers() {
+  const spacing = roundPressure(currentRound).spacing;
   const blockers = [{ x: player.x, y: player.y, minDist: 110 }];
-  for (const coin of collectibles) blockers.push({ x: coin.x, y: coin.y, minDist: 78 });
+  for (const coin of collectibles) blockers.push({ x: coin.x, y: coin.y, minDist: spacing });
   for (const power of powerups) blockers.push({ x: power.x, y: power.y, minDist: 64 });
   for (const echo of echoes) {
-    const ghost = ghostPoint(echo, roundFrame);
+    const ghost = ghostPoint(echo, ghostFrame());
     if (ghost) blockers.push({ x: ghost.x, y: ghost.y, minDist: 72 });
   }
   return blockers;
 }
 
-function spawnPoint() {
-  const point = pickSpawn(Math.random, fieldBounds(), spawnBlockers());
+function spawnPoint(cluster) {
+  const point = pickSpawn(Math.random, fieldBounds(), spawnBlockers(), cluster);
   if (Math.hypot(point.x - player.x, point.y - player.y) >= 80) return point;
   return {
     x: point.x < view.w / 2 ? 36 : view.w - 36,
@@ -601,8 +607,11 @@ function spawnPoint() {
 function spawnCollectibles() {
   collectibles = [];
   const kinds = [...COINS].sort(() => Math.random() - 0.5);
+  const reach = roundPressure(currentRound).reach;
   for (let i = 0; i < 3; i += 1) {
-    const point = spawnPoint();
+    const anchor = collectibles[0];
+    const cluster = anchor ? { x: anchor.x, y: anchor.y, reach } : null;
+    const point = spawnPoint(cluster);
     collectibles.push({
       x: point.x,
       y: point.y,
@@ -723,7 +732,7 @@ function advanceRound() {
   currentRound = next.round;
   roundFrame = next.frame;
   skipFrameTick = true;
-  grace = ROUND_GRACE;
+  grace = roundPressure(currentRound).grace;
   bannerText = `Round ${currentRound}`;
   bannerTimer = 110;
   AudioEngine.round();
@@ -753,7 +762,7 @@ function applyPowerup(power) {
 }
 
 function launchMissile() {
-  const target = ghostPoint(echoes[0], roundFrame);
+  const target = ghostPoint(echoes[0], ghostFrame());
   if (!target) {
     AudioEngine.deny();
     showToast('No echo yet');
@@ -790,7 +799,7 @@ function detonateMissile(x, y, hit) {
 
 function stepMissile() {
   if (missile) {
-    const target = ghostPoint(echoes[0], roundFrame);
+    const target = ghostPoint(echoes[0], ghostFrame());
     if (!target) {
       detonateMissile(missile.x, missile.y, false);
     } else if (missile) {
@@ -921,7 +930,7 @@ function update() {
   stepParticles();
 
   const vulnerable = grace <= 0 && activePowerup !== 'SHIELD';
-  if (hitsEcho(player, echoes, roundFrame, player.radius * 2 - 8, vulnerable)) {
+  if (hitsEcho(player, echoes, ghostFrame(), player.radius * 2 - 8, vulnerable)) {
     gameOver();
     return;
   }
@@ -1504,7 +1513,8 @@ function drawEchoes() {
 
   echoes.forEach((echo, index) => {
     if (!echo.length) return;
-    const frameIndex = ((roundFrame % echo.length) + echo.length) % echo.length;
+    const clock = ghostFrame();
+    const frameIndex = ((clock % echo.length) + echo.length) % echo.length;
     const ghost = echo[frameIndex];
     const previous = echo[Math.max(0, frameIndex - 2)];
     const lean = clamp(ghost.x - previous.x, -8, 8) / 8 * 0.55;
@@ -2388,6 +2398,12 @@ if (import.meta.env.DEV) {
       activePowerup = null;
       powerupTimer = 0;
     },
+    setRound(round) {
+      currentRound = round;
+    },
+    respawn() {
+      spawnCollectibles();
+    },
     state: () => ({
       gameState,
       score,
@@ -2404,6 +2420,8 @@ if (import.meta.env.DEV) {
       powerupTimer,
       grace,
       roundFrame,
+      pressure: roundPressure(currentRound),
+      ghost: echoes[0]?.length ? { ...ghostPoint(echoes[0], ghostFrame()) } : null,
       player: { x: player.x, y: player.y, targetX: player.targetX, targetY: player.targetY, radius: player.radius },
       echoColor,
       echoHat,

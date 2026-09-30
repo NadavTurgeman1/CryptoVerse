@@ -1,6 +1,6 @@
 # CryptoVerse
 
-A one-screen arcade game. You slide a fireball through a dark starfield, grab three crypto coins to finish a round, and then your route comes back as an echo. Later rounds play every previous route at the same time. Dollars stay in the shop between runs and dress the echoes.
+A one-screen arcade game. You slide a fireball through a dark starfield, grab three crypto coins to finish a round, and then your route comes back as an echo. Later rounds play every previous route at the same time, a little faster each round, with the coins pulled closer together and a shorter moment of safety when the next echo wakes. Dollars stay in the shop between runs and dress the echoes.
 
 The interface is in English.
 
@@ -23,7 +23,7 @@ npm run build
 - Slide a finger or the pointer anywhere. The fireball moves by that same distance and direction, and a tap does not send it to the pointer. Arrow keys / WASD still work.
 - In the shop, tap an item to see it on an echo before you buy it. Color, hat, and glasses can be previewed together.
 - Collect three crypto coins to seal the round. The path you just drew becomes a ghost. The wallet is in dollars.
-- You are safe for a short moment when a new echo wakes up, and for a moment after a shield ends.
+- You are safe for a short moment when a new echo wakes up, and for a moment after a shield ends. That opening moment gets shorter as the rounds climb, and the echoes replay your route faster.
 - Cyan shields block a hit for about five seconds. Gold `+` pickups add $5 and 25 points without cancelling a shield. An orange missile flies into the oldest echo and removes it.
 - Shop colors, hats, and glasses dress the echoes that chase you. One of each can be worn at the same time. You stay a fireball.
 
