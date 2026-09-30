@@ -9,6 +9,7 @@ import {
   joystickVector,
   pickSpawn,
   previewLoadout,
+  slideBy,
   safeJson,
   sanitizeUnlocks,
   sealPath,
@@ -39,7 +40,14 @@ const GLASSES = [
 ];
 
 const SHOP = { color: COLORS, hat: HATS, glasses: GLASSES };
-const COIN_RADIUS = 12;
+const PLANET_RADIUS = 17;
+const PLANETS = [
+  { id: 'btc', symbol: '₿', light: '#fff3cc', mid: '#e8b03a', dark: '#6e4210', glow: '255, 186, 64', ink: '#4a2a08', world: 'saturn' },
+  { id: 'eth', symbol: 'Ξ', light: '#f2f6ff', mid: '#7ea6e6', dark: '#1a3058', glow: '140, 176, 255', ink: '#0e1c36', world: 'bands' },
+  { id: 'xrp', symbol: '✕', light: '#f5f7fb', mid: '#8d98ab', dark: '#2a313e', glow: '214, 222, 236', ink: '#f7f9fc', world: 'plain' },
+  { id: 'sol', symbol: '', light: '#ffd2bc', mid: '#e15b38', dark: '#64180f', glow: '255, 96, 48', ink: '#fff6f0', world: 'mars' },
+  { id: 'bnb', symbol: '', light: '#fff4cc', mid: '#f0c14b', dark: '#8a5e10', glow: '255, 204, 80', ink: '#5a3a08', world: 'bnb' },
+];
 const JOYSTICK_RADIUS = 56;
 const JOYSTICK_DEADZONE = 0.16;
 
@@ -315,7 +323,7 @@ function renderProfile() {
   const root = document.getElementById('profile-stats');
   root.replaceChildren();
   const rows = [
-    ['Coins', coins],
+    ['Dollars', `$${coins}`],
     ['Best score', bestScore],
     ['Best round', bestRound],
     ['Runs', gamesPlayed],
@@ -438,10 +446,10 @@ function syncTryAction() {
     button.textContent = `Equip ${item.name}`;
   } else if (coins >= item.price) {
     button.disabled = false;
-    button.textContent = `Buy ${item.name} · ${item.price}`;
+    button.textContent = `Buy ${item.name} · $${item.price}`;
   } else {
     button.disabled = true;
-    button.textContent = `Need ${item.price} coins`;
+    button.textContent = `Need $${item.price}`;
   }
 }
 
@@ -484,7 +492,7 @@ function renderSlot(containerId, slot) {
 
     const meta = document.createElement('span');
     meta.className = 'shop-meta';
-    meta.textContent = selected ? 'Equipped' : unlocked ? 'Owned' : `${item.price} coins`;
+    meta.textContent = selected ? 'Equipped' : unlocked ? 'Owned' : `$${item.price}`;
 
     button.append(name, meta);
     button.addEventListener('pointerenter', (event) => {
@@ -571,7 +579,7 @@ function fieldBounds() {
 
 function spawnBlockers() {
   const blockers = [{ x: player.x, y: player.y, minDist: 110 }];
-  for (const coin of collectibles) blockers.push({ x: coin.x, y: coin.y, minDist: 56 });
+  for (const coin of collectibles) blockers.push({ x: coin.x, y: coin.y, minDist: 78 });
   for (const power of powerups) blockers.push({ x: power.x, y: power.y, minDist: 64 });
   for (const echo of echoes) {
     const ghost = ghostPoint(echo, roundFrame);
@@ -591,9 +599,15 @@ function spawnPoint() {
 
 function spawnCollectibles() {
   collectibles = [];
+  const kinds = [...PLANETS].sort(() => Math.random() - 0.5);
   for (let i = 0; i < 3; i += 1) {
     const point = spawnPoint();
-    collectibles.push({ x: point.x, y: point.y, radius: COIN_RADIUS });
+    collectibles.push({
+      x: point.x,
+      y: point.y,
+      radius: PLANET_RADIUS,
+      kind: kinds[i].id,
+    });
   }
   if (powerups.length < 2 && Math.random() < 0.4) {
     const point = spawnPoint();
@@ -678,7 +692,7 @@ function buyCosmetic(item) {
   const result = applyCosmetic(cosmeticLoadout(), item);
   if (result.status === 'broke') {
     AudioEngine.deny();
-    showToast('Not enough coins');
+    showToast('Not enough dollars');
     return false;
   }
 
@@ -734,7 +748,7 @@ function applyPowerup(power) {
   score += COIN_SCORE;
   saveAll();
   AudioEngine.coin();
-  showToast(`Bonus +${COIN_BONUS} coins`);
+  showToast(`Bonus +$${COIN_BONUS}`);
 }
 
 function launchMissile() {
@@ -942,9 +956,40 @@ function gameOver() {
   announce(`You lost. ${summary}`);
 }
 
+function mulberry32(seed) {
+  let value = seed >>> 0;
+  return () => {
+    value += 0x6d2b79f5;
+    let t = value;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+let starfield = null;
+
+function ensureStars() {
+  if (starfield && starfield.w === view.w && starfield.h === view.h) return;
+  const rand = mulberry32(11);
+  const count = Math.round((view.w * view.h) / 3400);
+  const points = [];
+  for (let i = 0; i < count; i += 1) {
+    const roll = rand();
+    points.push({
+      x: rand() * view.w,
+      y: rand() * view.h,
+      r: roll > 0.96 ? 2.1 : roll > 0.9 ? 1.45 : 0.45 + rand() * 0.7,
+      phase: rand() * Math.PI * 2,
+      tint: roll > 0.86 ? '186, 206, 255' : roll > 0.74 ? '255, 226, 186' : '255, 255, 255',
+    });
+  }
+  starfield = { w: view.w, h: view.h, points };
+}
+
 function drawGrid() {
   ctx.save();
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
   ctx.lineWidth = 1;
   const gap = 40;
   for (let x = gap; x < view.w; x += gap) {
@@ -975,20 +1020,29 @@ function drawAtmosphere() {
     const y = (drift.y + Math.cos(now * 0.1 + drift.x) * 0.06) * view.h;
     const radius = Math.max(view.w, view.h) * drift.r;
     const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
-    glow.addColorStop(0, `rgba(${drift.color}, 0.16)`);
+    glow.addColorStop(0, `rgba(${drift.color}, 0.07)`);
     glow.addColorStop(1, `rgba(${drift.color}, 0)`);
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, view.w, view.h);
   }
 
-  for (let i = 0; i < 26; i += 1) {
-    const x = ((Math.sin(now * 0.17 + i * 1.9) * 0.5 + 0.5) * view.w);
-    const y = ((i * 83 + now * 22) % (view.h + 20)) - 10;
-    const alpha = 0.18 + Math.sin(now * 2.2 + i) * 0.1;
-    ctx.fillStyle = i % 3 === 0 ? `rgba(255, 70, 120, ${alpha})` : `rgba(120, 245, 255, ${alpha})`;
+  ensureStars();
+  for (const star of starfield.points) {
+    const twinkle = 0.62 + Math.sin(now * 1.4 + star.phase) * 0.32;
+    ctx.fillStyle = `rgba(${star.tint}, ${twinkle})`;
     ctx.beginPath();
-    ctx.arc(x, y, i % 4 === 0 ? 1.7 : 1, 0, Math.PI * 2);
+    ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
     ctx.fill();
+    if (star.r > 1.6) {
+      ctx.strokeStyle = `rgba(${star.tint}, ${twinkle * 0.7})`;
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(star.x - star.r * 2.2, star.y);
+      ctx.lineTo(star.x + star.r * 2.2, star.y);
+      ctx.moveTo(star.x, star.y - star.r * 2.2);
+      ctx.lineTo(star.x, star.y + star.r * 2.2);
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }
@@ -1003,7 +1057,7 @@ function drawVignette() {
     Math.max(view.w, view.h) * 0.72,
   );
   glow.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  glow.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+  glow.addColorStop(1, 'rgba(0, 0, 0, 0.72)');
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, view.w, view.h);
 }
@@ -1015,6 +1069,35 @@ function strokePath(points) {
   for (let i = step; i < points.length; i += step) ctx.lineTo(points[i].x, points[i].y);
   const last = points[points.length - 1];
   ctx.lineTo(last.x, last.y);
+}
+
+function proximity(x, y) {
+  const dist = Math.hypot(x - player.x, y - player.y);
+  return clamp(1 - dist / 250, 0, 1);
+}
+
+function drawLitRibbon(points, color, width, alpha) {
+  if (points.length < 2) return;
+  const step = Math.max(1, Math.floor(points.length / 220));
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (let i = 0; i < points.length - 1; i += step) {
+    const start = points[i];
+    const end = points[Math.min(points.length - 1, i + step)];
+    const near = proximity((start.x + end.x) / 2, (start.y + end.y) / 2);
+    const strength = 0.62 + near * 1.25;
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.strokeStyle = hexAlpha(color, Math.min(0.95, alpha * 0.42 * strength));
+    ctx.lineWidth = width * (3.4 + near * 3.2);
+    ctx.stroke();
+    ctx.strokeStyle = hexAlpha(color, Math.min(1, alpha * strength));
+    ctx.lineWidth = width * (1.25 + near * 1.45);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawRibbon(points, color, width, alpha) {
@@ -1414,8 +1497,8 @@ function drawAfterimages(path, index, color, hollow) {
 
 function drawEchoes() {
   echoes.forEach((echo, index) => {
-    const alpha = Math.min(0.7, 0.18 + ((index + 1) / echoes.length) * 0.45);
-    drawRibbon(echo, echoColor, 2.2, alpha);
+    const alpha = 0.55 + ((index + 1) / echoes.length) * 0.4;
+    drawLitRibbon(echo, echoColor, 2.3, Math.min(1, alpha));
   });
 
   echoes.forEach((echo, index) => {
@@ -1425,11 +1508,12 @@ function drawEchoes() {
     const previous = echo[Math.max(0, frameIndex - 2)];
     const lean = clamp(ghost.x - previous.x, -8, 8) / 8 * 0.55;
     const newest = index === echoes.length - 1;
+    const near = proximity(ghost.x, ghost.y);
     drawAfterimages(echo, frameIndex, echoColor, true);
     drawSpirit(ghost.x, ghost.y, {
       color: echoColor,
       radius: 17,
-      alpha: newest ? 0.94 : 0.58,
+      alpha: Math.min(1, (newest ? 0.78 : 0.56) + near * 0.28),
       phase: performance.now() / 190 + index * 1.3,
       lean,
       hollow: true,
@@ -1439,74 +1523,158 @@ function drawEchoes() {
   });
 }
 
-function drawGoldCoin(x, y, radius) {
-  const r = radius;
+function planetById(kind) {
+  return PLANETS.find((planet) => planet.id === kind) ?? PLANETS[0];
+}
+
+function drawSaturnRings(radius, front) {
+  ctx.save();
+  ctx.rotate(-0.45);
+  ctx.strokeStyle = front ? 'rgba(255, 226, 160, 0.95)' : 'rgba(196, 150, 70, 0.8)';
+  ctx.lineWidth = radius * 0.18;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, radius * 1.75, radius * 0.46, 0, front ? 0 : Math.PI, front ? Math.PI : Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawXi(radius) {
+  ctx.strokeStyle = '#f4f8ff';
+  ctx.lineWidth = Math.max(1.5, radius * 0.11);
+  ctx.lineCap = 'round';
+  const top = -radius * 0.34;
+  const bottom = radius * 0.34;
+  ctx.beginPath();
+  ctx.moveTo(-radius * 0.24, top);
+  ctx.lineTo(radius * 0.26, top);
+  ctx.moveTo(-radius * 0.16, 0);
+  ctx.lineTo(radius * 0.18, 0);
+  ctx.moveTo(-radius * 0.24, bottom);
+  ctx.lineTo(radius * 0.26, bottom);
+  ctx.moveTo(-radius * 0.2, top);
+  ctx.lineTo(-radius * 0.02, bottom);
+  ctx.stroke();
+}
+
+function drawSolanaMark(radius) {
+  ctx.fillStyle = '#fff7f2';
+  for (let i = 0; i < 3; i += 1) {
+    const y = (i - 1) * radius * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(-radius * 0.32, y + radius * 0.08);
+    ctx.lineTo(radius * 0.18, y - radius * 0.08);
+    ctx.lineTo(radius * 0.32, y + radius * 0.02);
+    ctx.lineTo(-radius * 0.18, y + radius * 0.18);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function drawBnbMark(radius) {
+  ctx.fillStyle = '#6a4008';
+  ctx.beginPath();
+  ctx.moveTo(0, -radius * 0.36);
+  ctx.lineTo(radius * 0.3, 0);
+  ctx.lineTo(0, radius * 0.36);
+  ctx.lineTo(-radius * 0.3, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#fff6d4';
+  ctx.beginPath();
+  ctx.moveTo(0, -radius * 0.18);
+  ctx.lineTo(radius * 0.14, 0);
+  ctx.lineTo(0, radius * 0.18);
+  ctx.lineTo(-radius * 0.14, 0);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawPlanet(x, y, radius, kind) {
+  const planet = planetById(kind);
   ctx.save();
   ctx.translate(x, y);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+  if (planet.world === 'saturn') drawSaturnRings(radius, false);
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
   ctx.beginPath();
-  ctx.ellipse(1, r * 0.9, r * 0.82, r * 0.26, 0, 0, Math.PI * 2);
+  ctx.ellipse(2, radius * 0.95, radius * 0.72, radius * 0.2, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  const glow = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.9);
-  glow.addColorStop(0, 'rgba(255, 214, 90, 0.5)');
-  glow.addColorStop(1, 'rgba(255, 170, 0, 0)');
-  ctx.fillStyle = glow;
+  const body = ctx.createRadialGradient(-radius * 0.38, -radius * 0.42, radius * 0.08, radius * 0.2, radius * 0.12, radius);
+  body.addColorStop(0, planet.light);
+  body.addColorStop(0.5, planet.mid);
+  body.addColorStop(1, planet.dark);
+  ctx.fillStyle = body;
   ctx.beginPath();
-  ctx.arc(0, 0, r * 1.9, 0, Math.PI * 2);
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.fill();
 
-  const rim = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.15, 0, 0, r);
-  rim.addColorStop(0, '#fff6cf');
-  rim.addColorStop(0.42, '#ffc83a');
-  rim.addColorStop(0.78, '#e09200');
-  rim.addColorStop(1, '#7a3e00');
-  ctx.fillStyle = rim;
+  ctx.save();
   ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = 'rgba(92, 42, 0, 0.55)';
-  ctx.lineWidth = 1;
-  const reed = performance.now() / 900;
-  for (let i = 0; i < 18; i += 1) {
-    const angle = reed + (i / 18) * Math.PI * 2;
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.clip();
+  if (planet.world === 'bands') {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+    ctx.fillRect(-radius, -radius * 0.15, radius * 2, radius * 0.12);
+    ctx.fillStyle = 'rgba(10, 24, 48, 0.28)';
+    ctx.fillRect(-radius, radius * 0.22, radius * 2, radius * 0.16);
+  } else if (planet.world === 'mars') {
+    ctx.fillStyle = 'rgba(90, 16, 10, 0.45)';
     ctx.beginPath();
-    ctx.moveTo(Math.cos(angle) * r * 0.8, Math.sin(angle) * r * 0.8);
-    ctx.lineTo(Math.cos(angle) * r * 0.96, Math.sin(angle) * r * 0.96);
-    ctx.stroke();
+    ctx.ellipse(-radius * 0.15, radius * 0.12, radius * 0.38, radius * 0.22, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 236, 220, 0.85)';
+    ctx.beginPath();
+    ctx.ellipse(0, -radius * 0.72, radius * 0.34, radius * 0.16, 0, 0, Math.PI * 2);
+    ctx.fill();
   }
+  ctx.restore();
 
-  const face = ctx.createRadialGradient(-r * 0.28, -r * 0.32, r * 0.08, 0, 0, r * 0.7);
-  face.addColorStop(0, '#fff8dc');
-  face.addColorStop(0.5, '#ffd35c');
-  face.addColorStop(1, '#c98400');
-  ctx.fillStyle = face;
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(122, 62, 0, 0.65)';
-  ctx.lineWidth = Math.max(1.2, r * 0.07);
-  ctx.stroke();
+  if (planet.world === 'saturn') drawSaturnRings(radius, true);
 
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-  ctx.beginPath();
-  ctx.ellipse(-r * 0.32, -r * 0.34, r * 0.16, r * 0.08, -0.7, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#6a3808';
-  ctx.font = `800 ${Math.max(11, r * 1.15)}px "Noto Sans", "Liberation Sans", sans-serif`;
+  ctx.fillStyle = planet.ink;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('₿', r * 0.02, r * 0.06);
+  if (planet.world === 'mars') drawSolanaMark(radius * 0.85);
+  else if (planet.world === 'bnb') drawBnbMark(radius);
+  else if (planet.world === 'bands') drawXi(radius);
+  else {
+    ctx.font = `800 ${Math.max(12, radius * 0.95)}px "Noto Sans", "Liberation Sans", sans-serif`;
+    ctx.fillText(planet.symbol, 0, radius * 0.04);
+  }
   ctx.restore();
+}
+
+function drawGlow(x, y, radius, color, peak) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const light = ctx.createRadialGradient(x, y, radius * 0.08, x, y, radius);
+  light.addColorStop(0, `rgba(${color}, ${peak})`);
+  light.addColorStop(0.35, `rgba(${color}, ${peak * 0.35})`);
+  light.addColorStop(1, `rgba(${color}, 0)`);
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawSceneLights() {
+  drawGlow(player.x, player.y, 230, '255, 150, 60', 0.62);
+  drawGlow(player.x, player.y, 70, '255, 230, 180', 0.5);
+  const now = performance.now();
+  collectibles.forEach((coin, index) => {
+    const bob = Math.sin(now / 220 + index) * 3;
+    const planet = planetById(coin.kind);
+    drawGlow(coin.x, coin.y + bob, 86, planet.glow, 0.42);
+  });
 }
 
 function drawPickups() {
   const now = performance.now();
   collectibles.forEach((coin, index) => {
     const bob = Math.sin(now / 220 + index) * 3;
-    drawGoldCoin(coin.x, coin.y + bob, coin.radius);
+    drawPlanet(coin.x, coin.y + bob, coin.radius, coin.kind);
   });
 
   for (const power of powerups) {
@@ -1791,6 +1959,7 @@ function draw() {
   if (gameState === 'MENU') {
     drawMenuBackdrop();
   } else {
+    drawSceneLights();
     drawEchoes();
     drawPickups();
     drawParticles();
@@ -1840,14 +2009,49 @@ function pointFromEvent(event) {
   };
 }
 
-function updateTarget(event) {
+let slide = null;
+
+function fieldLimits() {
+  return {
+    minX: player.radius,
+    maxX: view.w - player.radius,
+    minY: player.radius,
+    maxY: view.h - player.radius,
+  };
+}
+
+function beginSlide(event) {
+  if (slide || gameState !== 'PLAYING') return;
   const point = pointFromEvent(event);
-  player.targetX = point.x;
-  player.targetY = point.y;
+  slide = { id: event.pointerId, x: point.x, y: point.y };
+  isDragging = true;
+  player.targetX = player.x;
+  player.targetY = player.y;
+  try { canvas.setPointerCapture(event.pointerId); } catch { /* synthetic pointers */ }
+}
+
+function moveSlide(event) {
+  if (!slide || event.pointerId !== slide.id || gameState !== 'PLAYING') return;
+  const point = pointFromEvent(event);
+  const next = slideBy(player.x, player.y, point.x - slide.x, point.y - slide.y, fieldLimits());
+  slide.x = point.x;
+  slide.y = point.y;
+  player.x = next.x;
+  player.y = next.y;
+  player.targetX = next.x;
+  player.targetY = next.y;
+}
+
+function endSlide(event) {
+  if (!slide) return;
+  if (event && event.pointerId !== slide.id) return;
+  slide = null;
+  isDragging = false;
 }
 
 function endDrag() {
   isDragging = false;
+  slide = null;
 }
 
 function updateJoystick(event) {
@@ -1868,41 +2072,17 @@ function bindInput() {
   canvas.addEventListener('pointerdown', (event) => {
     if (gameState !== 'PLAYING') return;
     AudioEngine.unlock();
-    if (event.pointerType === 'touch') {
-      const point = pointFromEvent(event);
-      joystick.active = true;
-      joystick.pointerId = event.pointerId;
-      joystick.ox = point.x;
-      joystick.oy = point.y;
-      joystick.x = 0;
-      joystick.y = 0;
-      joystick.amount = 0;
-      try { canvas.setPointerCapture(event.pointerId); } catch { /* synthetic touches */ }
-      return;
-    }
-    isDragging = true;
-    try { canvas.setPointerCapture(event.pointerId); } catch { /* synthetic pointers */ }
-    updateTarget(event);
+    beginSlide(event);
   });
-  canvas.addEventListener('pointermove', (event) => {
-    if (joystick.active && event.pointerId === joystick.pointerId) {
-      updateJoystick(event);
-      return;
-    }
-    if (!isDragging || gameState !== 'PLAYING') return;
-    updateTarget(event);
-  });
-  window.addEventListener('pointermove', (event) => {
-    if (!joystick.active || event.pointerId !== joystick.pointerId) return;
-    updateJoystick(event);
-  });
+  canvas.addEventListener('pointermove', moveSlide);
+  window.addEventListener('pointermove', moveSlide);
   window.addEventListener('pointerup', (event) => {
     endJoystick(event);
-    endDrag();
+    endSlide(event);
   });
   window.addEventListener('pointercancel', (event) => {
     endJoystick(event);
-    endDrag();
+    endSlide(event);
   });
 
   window.addEventListener('keydown', (event) => {
@@ -1916,6 +2096,7 @@ function bindInput() {
   window.addEventListener('blur', () => {
     keys.clear();
     isDragging = false;
+    slide = null;
     clearJoystick();
   });
   window.addEventListener('resize', resizeCanvas);
@@ -1928,10 +2109,6 @@ function bindUI() {
   document.getElementById('close-shop').addEventListener('click', closeShop);
   document.getElementById('menu-btn').addEventListener('click', returnToMenu);
   document.getElementById('try-on-buy').addEventListener('click', confirmTryOn);
-  const coarse = window.matchMedia('(pointer: coarse)').matches;
-  if (coarse) {
-    document.getElementById('controls-hint').textContent = 'Hold anywhere and tilt the stick';
-  }
 }
 
 loadSave();
@@ -1969,7 +2146,11 @@ if (import.meta.env.DEV) {
       player.targetY = y;
     },
     placeCoins(list) {
-      collectibles = list.map((coin) => ({ radius: COIN_RADIUS, ...coin }));
+      collectibles = list.map((coin, index) => ({
+        radius: PLANET_RADIUS,
+        kind: PLANETS[index % PLANETS.length].id,
+        ...coin,
+      }));
     },
     placePowerups(list) {
       powerups = list.map((power) => ({ ...power }));

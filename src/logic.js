@@ -4,6 +4,14 @@ export function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+/** Move by the pointer's delta. A press with no movement leaves the point where it is. */
+export function slideBy(x, y, dx, dy, bounds) {
+  return {
+    x: clamp(x + dx, bounds.minX, bounds.maxX),
+    y: clamp(y + dy, bounds.minY, bounds.maxY),
+  };
+}
+
 export function clampInt(value, fallback = 0) {
   const n = typeof value === 'number' ? value : Number.parseInt(value, 10);
   if (!Number.isFinite(n) || n < 0) return fallback;

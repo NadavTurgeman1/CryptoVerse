@@ -9,6 +9,7 @@ import {
   joystickVector,
   pickSpawn,
   previewLoadout,
+  slideBy,
   resolvePurchase,
   safeJson,
   sanitizeUnlocks,
@@ -150,6 +151,16 @@ test('a homing step moves toward the target and reports the gap', () => {
   const arrived = stepHoming({ x: 4, y: 4, vx: 1, vy: 0 }, { x: 4, y: 4 }, 10, 1);
   assert.equal(arrived.distance, 0);
   assert.equal(arrived.x, 4);
+});
+
+test('a slide moves by the finger delta and does not jump to the finger', () => {
+  const bounds = { minX: 14, maxX: 466, minY: 14, maxY: 786 };
+  const still = slideBy(200, 300, 0, 0, bounds);
+  assert.deepEqual(still, { x: 200, y: 300 });
+  const right = slideBy(200, 300, 48, -12, bounds);
+  assert.deepEqual(right, { x: 248, y: 288 });
+  const edge = slideBy(450, 20, 40, -20, bounds);
+  assert.deepEqual(edge, { x: 466, y: 14 });
 });
 
 test('spawns stay away from the player when the field has room', () => {

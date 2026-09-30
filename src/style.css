@@ -1,5 +1,5 @@
 :root {
-  --bg-color: #0d0f18;
+  --bg-color: #05060c;
   --panel-bg: rgba(16, 20, 34, 0.94);
   --accent: #00f0ff;
   --accent-glow: rgba(0, 240, 255, 0.4);
@@ -26,7 +26,7 @@ body {
 
 body {
   background:
-    radial-gradient(circle at 50% 20%, rgba(0, 240, 255, 0.08), transparent 32%),
+    radial-gradient(circle at 50% 20%, rgba(80, 110, 180, 0.05), transparent 28%),
     var(--bg-color);
   color: var(--text-main);
   overflow: hidden;
@@ -44,7 +44,7 @@ body {
   max-width: 480px;
   height: 100dvh;
   max-height: 850px;
-  background: radial-gradient(circle at center, #15192c 0%, #080a10 100%);
+  background: radial-gradient(circle at center, #0c1018 0%, #03040a 100%);
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
   overflow: hidden;
 }
