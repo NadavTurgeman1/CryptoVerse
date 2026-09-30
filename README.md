@@ -2,7 +2,7 @@
 
 A one-screen arcade game. You drag yourself around a dark arena, grab three coins to finish a round, and then your route comes back as an echo. Later rounds play every previous route at the same time. Coins stay in the shop between runs and unlock player colors.
 
-The interface is in Hebrew and laid out right to left.
+The interface is in English.
 
 ## Run locally
 
@@ -20,7 +20,7 @@ npm run build
 
 ## How to play
 
-- Drag the orb, or use the arrow keys / WASD (physical keys, so a Hebrew keyboard layout still works).
+- Drag the spirit, or use the arrow keys / WASD.
 - Collect three coins to seal the round. The path you just drew becomes a ghost.
 - You are safe for a short moment when a new echo wakes up, and for a moment after a shield ends.
 - Cyan shields block a hit for about five seconds. Gold `+` pickups add 5 coins and 25 points without cancelling a shield.

@@ -12,10 +12,10 @@ import {
 } from './logic.js';
 
 const CATALOG = [
-  { id: '#00f0ff', name: 'ניאון תכלת', price: 0 },
-  { id: '#ff0055', name: 'ורד מגנטה', price: 50 },
-  { id: '#00ff66', name: 'ירוק מטריקס', price: 100 },
-  { id: '#ffbb00', name: 'צהוב זהב', price: 150 },
+  { id: '#00f0ff', name: 'Cyan', price: 0 },
+  { id: '#ff0055', name: 'Magenta', price: 50 },
+  { id: '#00ff66', name: 'Matrix', price: 100 },
+  { id: '#ffbb00', name: 'Gold', price: 150 },
 ];
 
 const STORAGE = {
@@ -95,7 +95,7 @@ let bestScore = 0;
 let bestRound = 0;
 let gamesPlayed = 0;
 
-const player = { x: 240, y: 400, radius: 14, targetX: 240, targetY: 400 };
+const player = { x: 240, y: 400, radius: 14, targetX: 240, targetY: 400, vx: 0, vy: 0 };
 let echoes = [];
 let currentPath = [];
 let collectibles = [];
@@ -201,15 +201,15 @@ function syncHUD() {
   setText('coins-val', coins);
   setText('wallet-val', coins);
   const status = activePowerup === 'SHIELD'
-    ? `🛡️ ${Math.ceil(powerupTimer / 60)}`
-    : 'אין';
-  setText('powerup-status', `כוח: ${status}`);
+    ? `Shield ${Math.ceil(powerupTimer / 60)}s`
+    : 'None';
+  setText('powerup-status', status);
 }
 
 function syncMenu() {
   setText(
     'menu-best',
-    bestScore > 0 ? `שיא: ${bestScore} נקודות · סיבוב ${bestRound}` : 'עדיין אין שיא',
+    bestScore > 0 ? `Best: ${bestScore} pts · Round ${bestRound}` : 'No record yet',
   );
 }
 
@@ -217,10 +217,10 @@ function renderProfile() {
   const root = document.getElementById('profile-stats');
   root.replaceChildren();
   const rows = [
-    ['מטבעות', coins],
-    ['שיא נקודות', bestScore],
-    ['שיא סיבוב', bestRound],
-    ['משחקים', gamesPlayed],
+    ['Coins', coins],
+    ['Best score', bestScore],
+    ['Best round', bestRound],
+    ['Runs', gamesPlayed],
   ];
   for (const [label, value] of rows) {
     const row = document.createElement('div');
@@ -258,7 +258,7 @@ function renderShop() {
 
     const meta = document.createElement('span');
     meta.className = 'shop-meta';
-    meta.textContent = selected ? 'מצויד' : unlocked ? 'פתוח' : `${item.price} מטבעות`;
+    meta.textContent = selected ? 'Equipped' : unlocked ? 'Owned' : `${item.price} coins`;
 
     button.append(swatch, name, meta);
     button.addEventListener('click', () => buyColor(item));
@@ -360,8 +360,8 @@ function startGame() {
   roundFrame = 0;
   skipFrameTick = false;
   shake = 0;
-  bannerText = 'אסוף 3 מטבעות';
-  bannerTimer = 110;
+  bannerText = '';
+  bannerTimer = 0;
   gamesPlayed += 1;
 
   resizeCanvas();
@@ -372,7 +372,7 @@ function startGame() {
   spawnCollectibles();
   saveAll();
   syncHUD();
-  announce('המשחק התחיל. אסוף שלושה מטבעות.');
+  announce('Round 1');
   AudioEngine.unlock();
 }
 
@@ -400,7 +400,7 @@ function buyColor(item) {
   );
   if (result.status === 'broke') {
     AudioEngine.deny();
-    showToast('אין מספיק מטבעות');
+    showToast('Not enough coins');
     return;
   }
 
@@ -410,7 +410,7 @@ function buyColor(item) {
   saveAll();
   if (result.status === 'bought') {
     AudioEngine.coin();
-    showToast(`${item.name} נפתח`);
+    showToast(`${item.name} unlocked`);
   }
   renderShop();
 }
@@ -423,7 +423,7 @@ function advanceRound() {
   roundFrame = next.frame;
   skipFrameTick = true;
   grace = ROUND_GRACE;
-  bannerText = `סיבוב ${currentRound} — ההד התעורר`;
+  bannerText = `Round ${currentRound}`;
   bannerTimer = 110;
   AudioEngine.round();
   spawnCollectibles();
@@ -443,7 +443,7 @@ function applyPowerup(power) {
   score += COIN_SCORE;
   saveAll();
   AudioEngine.coin();
-  showToast(`בונוס +${COIN_BONUS} מטבעות`);
+  showToast(`Bonus +${COIN_BONUS} coins`);
 }
 
 function collectCoins() {
@@ -487,12 +487,26 @@ function movePlayer() {
     }
   }
 
+  const previousX = player.x;
+  const previousY = player.y;
   player.x += (player.targetX - player.x) * 0.2;
   player.y += (player.targetY - player.y) * 0.2;
   player.x = clampToField(player.x, player.radius, view.w - player.radius);
   player.y = clampToField(player.y, player.radius, view.h - player.radius);
   player.targetX = clampToField(player.targetX, player.radius, view.w - player.radius);
   player.targetY = clampToField(player.targetY, player.radius, view.h - player.radius);
+  player.vx = player.x - previousX;
+  player.vy = player.y - previousY;
+  if (player.vx * player.vx + player.vy * player.vy > 0.8 && particles.length < 70 && Math.random() < 0.45) {
+    particles.push({
+      x: player.x - player.vx * 2,
+      y: player.y - player.vy * 2,
+      vx: -player.vx * 0.15 + (Math.random() - 0.5) * 0.4,
+      vy: -player.vy * 0.15 - 0.25,
+      life: 14,
+      color: activeColor,
+    });
+  }
 }
 
 function stepParticles() {
@@ -549,18 +563,20 @@ function gameOver() {
   syncHUD();
   syncMenu();
 
-  const celebrate = hadRecord && (scoreRecord || roundRecord) ? ' · שיא חדש!' : '';
-  const summary = `סיבוב ${currentRound} · ${score} נקודות${celebrate}`;
+  const celebrate = hadRecord && (scoreRecord || roundRecord) ? ' · New record!' : '';
+  const summary = `Round ${currentRound} · ${score} pts${celebrate}`;
   setText('final-stats', summary);
-  setText('final-best', `שיא אישי: ${bestScore} נקודות · סיבוב ${bestRound}`);
+  setText('final-best', `Best: ${bestScore} pts · Round ${bestRound}`);
   setMode('GAMEOVER');
   showScreen('game-over-screen');
-  announce(`הפסדת. ${summary}`);
+  burst(player.x, player.y, activeColor);
+  burst(player.x, player.y, '#ff2a55');
+  announce(`You lost. ${summary}`);
 }
 
 function drawGrid() {
   ctx.save();
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
   ctx.lineWidth = 1;
   const gap = 40;
   for (let x = gap; x < view.w; x += gap) {
@@ -578,59 +594,247 @@ function drawGrid() {
   ctx.restore();
 }
 
-function drawRoute(points, color, width) {
-  if (points.length < 2) return;
+function drawAtmosphere() {
+  const now = performance.now() / 1000;
   ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = width;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.beginPath();
+  const drifts = [
+    { x: 0.25, y: 0.3, color: '255, 40, 90', r: 0.55 },
+    { x: 0.75, y: 0.62, color: '0, 220, 255', r: 0.48 },
+    { x: 0.5, y: 0.85, color: '120, 40, 255', r: 0.36 },
+  ];
+  for (const drift of drifts) {
+    const x = (drift.x + Math.sin(now * 0.12 + drift.y) * 0.08) * view.w;
+    const y = (drift.y + Math.cos(now * 0.1 + drift.x) * 0.06) * view.h;
+    const radius = Math.max(view.w, view.h) * drift.r;
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    glow.addColorStop(0, `rgba(${drift.color}, 0.16)`);
+    glow.addColorStop(1, `rgba(${drift.color}, 0)`);
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, view.w, view.h);
+  }
+
+  for (let i = 0; i < 26; i += 1) {
+    const x = ((Math.sin(now * 0.17 + i * 1.9) * 0.5 + 0.5) * view.w);
+    const y = ((i * 83 + now * 22) % (view.h + 20)) - 10;
+    const alpha = 0.18 + Math.sin(now * 2.2 + i) * 0.1;
+    ctx.fillStyle = i % 3 === 0 ? `rgba(255, 70, 120, ${alpha})` : `rgba(120, 245, 255, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(x, y, i % 4 === 0 ? 1.7 : 1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawVignette() {
+  const glow = ctx.createRadialGradient(
+    view.w / 2,
+    view.h / 2,
+    Math.min(view.w, view.h) * 0.2,
+    view.w / 2,
+    view.h / 2,
+    Math.max(view.w, view.h) * 0.72,
+  );
+  glow.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  glow.addColorStop(1, 'rgba(0, 0, 0, 0.5)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, view.w, view.h);
+}
+
+function strokePath(points) {
   const step = Math.max(1, Math.floor(points.length / 500));
+  ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
   for (let i = step; i < points.length; i += step) ctx.lineTo(points[i].x, points[i].y);
   const last = points[points.length - 1];
   ctx.lineTo(last.x, last.y);
+}
+
+function drawRibbon(points, color, width, alpha) {
+  if (points.length < 2) return;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = hexAlpha(color, alpha * 0.22);
+  ctx.lineWidth = width * 4.5;
+  strokePath(points);
+  ctx.stroke();
+  ctx.strokeStyle = hexAlpha(color, alpha);
+  ctx.lineWidth = width;
+  strokePath(points);
   ctx.stroke();
   ctx.restore();
 }
 
+function traceGhost(radius, phase) {
+  const wave = (index) => Math.sin(phase * 2.4 + index) * radius * 0.18;
+  ctx.beginPath();
+  ctx.moveTo(-radius * 0.92, radius * 0.05);
+  ctx.bezierCurveTo(-radius * 1.08, -radius * 0.95, -radius * 0.45, -radius * 1.35, 0, -radius * 1.28);
+  ctx.bezierCurveTo(radius * 0.5, -radius * 1.35, radius * 1.08, -radius * 0.9, radius * 0.92, radius * 0.08);
+  ctx.quadraticCurveTo(radius * 0.62, radius * 0.95 + wave(0), radius * 0.28, radius * 0.22);
+  ctx.quadraticCurveTo(0, radius * 1.15 + wave(1.4), -radius * 0.32, radius * 0.2);
+  ctx.quadraticCurveTo(-radius * 0.68, radius * 1.02 + wave(2.6), -radius * 0.92, radius * 0.05);
+  ctx.closePath();
+}
+
+function drawSpirit(x, y, options) {
+  const radius = options.radius ?? 17;
+  const color = options.color ?? '#00f0ff';
+  const alpha = options.alpha ?? 1;
+  const phase = options.phase ?? 0;
+  const lean = options.lean ?? 0;
+  const hollow = options.hollow ?? false;
+  const aura = options.aura !== false;
+  const bob = Math.sin(phase) * 1.8;
+
+  ctx.save();
+  ctx.translate(x, y + bob);
+  ctx.rotate(lean);
+  ctx.globalAlpha = alpha;
+
+  if (aura) {
+    const haze = ctx.createRadialGradient(0, -radius * 0.1, radius * 0.2, 0, 0, radius * 2.5);
+    haze.addColorStop(0, hexAlpha(color, hollow ? 0.32 : 0.5));
+    haze.addColorStop(1, hexAlpha(color, 0));
+    ctx.fillStyle = haze;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = hexAlpha(color, hollow ? 0.16 : 0.22);
+  ctx.beginPath();
+  ctx.ellipse(0, radius * 0.95, radius * 0.72, radius * 0.16, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  traceGhost(radius, phase);
+  const body = ctx.createLinearGradient(0, -radius * 1.2, 0, radius);
+  if (hollow) {
+    body.addColorStop(0, 'rgba(255, 236, 244, 0.55)');
+    body.addColorStop(0.42, hexAlpha(color, 0.42));
+    body.addColorStop(1, hexAlpha(color, 0.08));
+  } else {
+    body.addColorStop(0, 'rgba(255, 255, 255, 0.92)');
+    body.addColorStop(0.38, hexAlpha(color, 0.95));
+    body.addColorStop(1, hexAlpha(color, 0.35));
+  }
+  ctx.fillStyle = body;
+  ctx.fill();
+
+  ctx.save();
+  traceGhost(radius, phase);
+  ctx.clip();
+  ctx.fillStyle = hollow ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.28)';
+  ctx.beginPath();
+  ctx.ellipse(-radius * 0.28, -radius * 0.48, radius * 0.26, radius * 0.46, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  traceGhost(radius, phase);
+  ctx.strokeStyle = hollow ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.7)';
+  ctx.lineWidth = hollow ? 1 : 1.4;
+  ctx.stroke();
+
+  const eyeY = -radius * 0.18;
+  const eyeR = Math.max(2.2, radius * 0.15);
+  const blink = Math.sin(phase * 0.35) > 0.97 ? 0.25 : 1;
+  ctx.fillStyle = hollow ? 'rgba(18, 0, 12, 0.88)' : 'rgba(255,255,255,0.95)';
+  ctx.beginPath();
+  ctx.ellipse(-radius * 0.32, eyeY, eyeR * 0.72, eyeR * blink, 0, 0, Math.PI * 2);
+  ctx.ellipse(radius * 0.3, eyeY, eyeR * 0.72, eyeR * blink, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (!hollow) {
+    ctx.fillStyle = hexAlpha(color, 0.9);
+    ctx.beginPath();
+    ctx.arc(-radius * 0.32, eyeY, eyeR * 0.28, 0, Math.PI * 2);
+    ctx.arc(radius * 0.3, eyeY, eyeR * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (aura) {
+    for (let spark = 0; spark < 3; spark += 1) {
+      const rise = (phase * 0.15 + spark / 3) % 1;
+      const sx = Math.sin(phase * 1.3 + spark * 2.1) * radius * 0.85;
+      const sy = radius * 0.4 - rise * radius * 2.8;
+      ctx.globalAlpha = alpha * (1 - rise) * 0.7;
+      ctx.fillStyle = hollow ? '#ffd0dc' : '#ffffff';
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawAfterimages(path, index, color, hollow) {
+  const count = hollow ? 4 : 6;
+  for (let step = count; step >= 1; step -= 1) {
+    const point = path[index - step * 3];
+    if (!point) continue;
+    const fade = 1 - step / (count + 1);
+    drawSpirit(point.x, point.y, {
+      color,
+      radius: hollow ? 10 + fade * 4 : 9 + fade * 5,
+      alpha: fade * (hollow ? 0.22 : 0.28),
+      phase: performance.now() / 220 - step,
+      lean: 0,
+      hollow,
+      aura: false,
+    });
+  }
+}
+
 function drawEchoes() {
   echoes.forEach((echo, index) => {
-    const alpha = Math.min(0.8, 0.16 + ((index + 1) / echoes.length) * 0.6);
-    drawRoute(echo, `rgba(255, 0, 85, ${alpha})`, 3);
+    const alpha = Math.min(0.7, 0.18 + ((index + 1) / echoes.length) * 0.5);
+    drawRibbon(echo, '#ff2a55', 2.2, alpha);
   });
 
-  for (const echo of echoes) {
-    const ghost = ghostPoint(echo, roundFrame);
-    if (!ghost) continue;
-    ctx.save();
-    ctx.fillStyle = '#ff0055';
-    ctx.shadowColor = '#ff0055';
-    ctx.shadowBlur = echoes.length > 8 ? 0 : 12;
-    ctx.beginPath();
-    ctx.arc(ghost.x, ghost.y, player.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
+  echoes.forEach((echo, index) => {
+    if (!echo.length) return;
+    const frameIndex = ((roundFrame % echo.length) + echo.length) % echo.length;
+    const ghost = echo[frameIndex];
+    const previous = echo[Math.max(0, frameIndex - 2)];
+    const lean = clamp(ghost.x - previous.x, -8, 8) / 8 * 0.55;
+    const newest = index === echoes.length - 1;
+    drawAfterimages(echo, frameIndex, newest ? '#ff2a55' : '#9d1744', true);
+    drawSpirit(ghost.x, ghost.y, {
+      color: newest ? '#ff2a55' : '#c81e4a',
+      radius: 17,
+      alpha: newest ? 0.92 : 0.62,
+      phase: performance.now() / 190 + index * 1.3,
+      lean,
+      hollow: true,
+    });
+  });
 }
 
 function drawPickups() {
   const now = performance.now();
   collectibles.forEach((coin, index) => {
-    const bob = Math.sin(now / 220 + index) * 2.2;
+    const bob = Math.sin(now / 220 + index) * 3;
+    const y = coin.y + bob;
     ctx.save();
-    ctx.fillStyle = '#ffbb00';
-    ctx.shadowColor = '#ffbb00';
-    ctx.shadowBlur = 10;
+    const glow = ctx.createRadialGradient(coin.x, y, 1, coin.x, y, 18);
+    glow.addColorStop(0, 'rgba(255, 214, 80, 0.55)');
+    glow.addColorStop(1, 'rgba(255, 187, 0, 0)');
+    ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(coin.x, coin.y + bob, coin.radius, 0, Math.PI * 2);
+    ctx.arc(coin.x, y, 18, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-    ctx.lineWidth = 1.5;
+    ctx.fillStyle = '#ffe28a';
     ctx.beginPath();
-    ctx.arc(coin.x, coin.y + bob, coin.radius * 0.45, 0, Math.PI * 2);
+    ctx.arc(coin.x, y, coin.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffbb00';
+    ctx.beginPath();
+    ctx.arc(coin.x, y, coin.radius * 0.62, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(coin.x - 2, y - 2, coin.radius * 0.28, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   });
@@ -674,40 +878,56 @@ function drawBonusIcon(x, y) {
 }
 
 function drawPlayer() {
-  ctx.save();
+  const phase = performance.now() / 170;
   const flickering = grace > 0 && Math.floor(grace / 4) % 2 === 0;
-  ctx.globalAlpha = flickering ? 0.45 : 1;
-  ctx.fillStyle = activeColor;
-  ctx.shadowColor = activeColor;
-  ctx.shadowBlur = activePowerup === 'SHIELD' ? 22 : 12;
-  ctx.beginPath();
-  ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-  ctx.beginPath();
-  ctx.arc(player.x - 4, player.y - 4, 3.5, 0, Math.PI * 2);
-  ctx.fill();
+  const lean = clamp(player.vx, -5, 5) / 5 * 0.5;
+  if (currentPath.length > 1) {
+    drawAfterimages(currentPath, currentPath.length - 1, activeColor, false);
+  }
+  drawSpirit(player.x, player.y, {
+    color: activeColor,
+    radius: 18,
+    alpha: flickering ? 0.42 : 1,
+    phase,
+    lean,
+    hollow: false,
+  });
 
-  if (activePowerup === 'SHIELD' || grace > 0) {
-    const spin = performance.now() / 280;
-    ctx.globalAlpha = activePowerup === 'SHIELD' ? 0.95 : 0.55;
-    ctx.strokeStyle = activePowerup === 'SHIELD' ? '#00f0ff' : 'rgba(255,255,255,0.8)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, player.radius + 8, spin, spin + Math.PI * 1.35);
-    ctx.stroke();
+  if (activePowerup !== 'SHIELD' && grace <= 0) return;
+  ctx.save();
+  const spin = performance.now() / 260;
+  const ring = activePowerup === 'SHIELD' ? '#7af6ff' : 'rgba(255,255,255,0.75)';
+  ctx.strokeStyle = ring;
+  ctx.lineWidth = 1.6;
+  ctx.globalAlpha = activePowerup === 'SHIELD' ? 0.85 : 0.45;
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, 28, spin, spin + Math.PI * 1.35);
+  ctx.stroke();
+  if (activePowerup === 'SHIELD') {
+    for (let i = 0; i < 3; i += 1) {
+      const angle = spin + (i * Math.PI * 2) / 3;
+      ctx.fillStyle = '#e8fdff';
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.arc(player.x + Math.cos(angle) * 28, player.y + Math.sin(angle) * 16, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.restore();
 }
 
 function drawParticles() {
   for (const particle of particles) {
+    const alpha = Math.max(0, particle.life / 24);
     ctx.save();
-    ctx.globalAlpha = Math.max(0, particle.life / 24);
+    ctx.globalAlpha = alpha * 0.35;
     ctx.fillStyle = particle.color;
     ctx.beginPath();
-    ctx.arc(particle.x, particle.y, 2.4, 0, Math.PI * 2);
+    ctx.arc(particle.x, particle.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.arc(particle.x, particle.y, 1.8, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -716,7 +936,7 @@ function drawParticles() {
 function drawBanner() {
   if (bannerTimer <= 0 || !bannerText) return;
   ctx.save();
-  ctx.font = '700 18px system-ui, "DejaVu Sans", "Noto Serif Hebrew", sans-serif';
+  ctx.font = '700 18px system-ui, "DejaVu Sans", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const y = Math.max(92, view.h * 0.16);
@@ -746,25 +966,29 @@ function drawDragReticle() {
 function drawMenuBackdrop() {
   const time = performance.now() / 1000;
   const cx = view.w / 2;
-  const cy = view.h * 0.62;
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255, 0, 85, 0.45)';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 78, time * 0.6, time * 0.6 + 4.4);
-  ctx.stroke();
-  ctx.fillStyle = '#ff0055';
-  ctx.shadowColor = '#ff0055';
-  ctx.shadowBlur = 16;
-  ctx.beginPath();
-  ctx.arc(cx + Math.cos(time + 2.1) * 78, cy + Math.sin(time + 2.1) * 48, 13, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = activeColor;
-  ctx.shadowColor = activeColor;
-  ctx.beginPath();
-  ctx.arc(cx + Math.cos(time) * 78, cy + Math.sin(time) * 48, 14, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  const cy = view.h * 0.72;
+  drawRibbon(
+    Array.from({ length: 28 }, (_, index) => {
+      const angle = time * 0.7 + index * 0.22;
+      return {
+        x: cx + Math.cos(angle) * 86,
+        y: cy + Math.sin(angle) * 36,
+      };
+    }),
+    '#ff2a55',
+    2,
+    0.35,
+  );
+  drawSpirit(
+    cx + Math.cos(time + 2.2) * 86,
+    cy + Math.sin(time + 2.2) * 36,
+    { color: '#ff2a55', radius: 18, phase: time * 3, lean: Math.cos(time) * 0.3, hollow: true },
+  );
+  drawSpirit(
+    cx + Math.cos(time) * 86,
+    cy + Math.sin(time) * 36,
+    { color: activeColor, radius: 18, phase: time * 3.2, lean: -Math.sin(time) * 0.3, hollow: false },
+  );
 }
 
 function draw() {
@@ -780,17 +1004,19 @@ function draw() {
   }
 
   drawGrid();
+  drawAtmosphere();
   if (gameState === 'MENU') {
     drawMenuBackdrop();
   } else {
     drawEchoes();
-    drawRoute(currentPath, hexAlpha(activeColor, 0.45), 2);
+    drawRibbon(currentPath, activeColor, 2.4, 0.55);
     drawPickups();
     drawParticles();
     drawPlayer();
     drawDragReticle();
     drawBanner();
   }
+  drawVignette();
   ctx.restore();
 }
 
