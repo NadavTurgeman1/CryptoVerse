@@ -40,13 +40,14 @@ const GLASSES = [
 ];
 
 const SHOP = { color: COLORS, hat: HATS, glasses: GLASSES };
-const PLANET_RADIUS = 17;
-const PLANETS = [
-  { id: 'btc', symbol: '₿', light: '#fff3cc', mid: '#e8b03a', dark: '#6e4210', glow: '255, 186, 64', ink: '#4a2a08', world: 'saturn' },
-  { id: 'eth', symbol: 'Ξ', light: '#f2f6ff', mid: '#7ea6e6', dark: '#1a3058', glow: '140, 176, 255', ink: '#0e1c36', world: 'bands' },
-  { id: 'xrp', symbol: '✕', light: '#f5f7fb', mid: '#8d98ab', dark: '#2a313e', glow: '214, 222, 236', ink: '#f7f9fc', world: 'plain' },
-  { id: 'sol', symbol: '', light: '#ffd2bc', mid: '#e15b38', dark: '#64180f', glow: '255, 96, 48', ink: '#fff6f0', world: 'mars' },
-  { id: 'bnb', symbol: '', light: '#fff4cc', mid: '#f0c14b', dark: '#8a5e10', glow: '255, 204, 80', ink: '#5a3a08', world: 'bnb' },
+const COIN_RADIUS = 16;
+const COINS = [
+  { id: 'btc' },
+  { id: 'eth' },
+  { id: 'xrp' },
+  { id: 'sol' },
+  { id: 'doge' },
+  { id: 'bnb' },
 ];
 const JOYSTICK_RADIUS = 56;
 const JOYSTICK_DEADZONE = 0.16;
@@ -599,13 +600,13 @@ function spawnPoint() {
 
 function spawnCollectibles() {
   collectibles = [];
-  const kinds = [...PLANETS].sort(() => Math.random() - 0.5);
+  const kinds = [...COINS].sort(() => Math.random() - 0.5);
   for (let i = 0; i < 3; i += 1) {
     const point = spawnPoint();
     collectibles.push({
       x: point.x,
       y: point.y,
-      radius: PLANET_RADIUS,
+      radius: COIN_RADIUS,
       kind: kinds[i].id,
     });
   }
@@ -1523,125 +1524,197 @@ function drawEchoes() {
   });
 }
 
-function planetById(kind) {
-  return PLANETS.find((planet) => planet.id === kind) ?? PLANETS[0];
+function coinById(kind) {
+  return COINS.find((coin) => coin.id === kind) ?? COINS[0];
 }
 
-function drawSaturnRings(radius, front) {
-  ctx.save();
-  ctx.rotate(-0.45);
-  ctx.strokeStyle = front ? 'rgba(255, 226, 160, 0.95)' : 'rgba(196, 150, 70, 0.8)';
-  ctx.lineWidth = radius * 0.18;
+function fillDiamond(x, y, size) {
   ctx.beginPath();
-  ctx.ellipse(0, 0, radius * 1.75, radius * 0.46, 0, front ? 0 : Math.PI, front ? Math.PI : Math.PI * 2);
+  ctx.moveTo(x, y - size);
+  ctx.lineTo(x + size, y);
+  ctx.lineTo(x, y + size);
+  ctx.lineTo(x - size, y);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawBitcoinMark(radius) {
+  const r = radius * 0.72;
+  ctx.fillStyle = '#c45f00';
+  ctx.fillRect(-r * 0.34, -r * 0.62, r * 0.13, r * 1.24);
+  ctx.fillRect(-r * 0.1, -r * 0.62, r * 0.13, r * 1.24);
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.42, -r * 0.4);
+  ctx.lineTo(r * 0.02, -r * 0.4);
+  ctx.arc(r * 0.02, -r * 0.2, r * 0.2, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(-r * 0.42, 0);
+  ctx.closePath();
+  ctx.moveTo(-r * 0.42, 0);
+  ctx.lineTo(r * 0.06, 0);
+  ctx.arc(r * 0.06, r * 0.22, r * 0.22, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(-r * 0.42, r * 0.44);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#f6d27a';
+  ctx.beginPath();
+  ctx.arc(r * 0.02, -r * 0.2, r * 0.09, 0, Math.PI * 2);
+  ctx.arc(r * 0.06, r * 0.22, r * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawEthereumMark(radius) {
+  const w = radius * 0.5;
+  const top = -radius * 0.52;
+  const waist = -radius * 0.02;
+  const notch = radius * 0.1;
+  const gap = radius * 0.24;
+  const bottom = radius * 0.56;
+  ctx.beginPath();
+  ctx.moveTo(0, top);
+  ctx.lineTo(-w, waist);
+  ctx.lineTo(0, notch);
+  ctx.closePath();
+  ctx.fillStyle = '#c5d2fb';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0, top);
+  ctx.lineTo(w, waist);
+  ctx.lineTo(0, notch);
+  ctx.closePath();
+  ctx.fillStyle = '#7f93e0';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-w, waist);
+  ctx.lineTo(0, notch + radius * 0.14);
+  ctx.lineTo(0, notch);
+  ctx.closePath();
+  ctx.fillStyle = '#a9b9f2';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(w, waist);
+  ctx.lineTo(0, notch + radius * 0.14);
+  ctx.lineTo(0, notch);
+  ctx.closePath();
+  ctx.fillStyle = '#6278c8';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-w, gap);
+  ctx.lineTo(0, bottom);
+  ctx.lineTo(0, gap + radius * 0.08);
+  ctx.closePath();
+  ctx.fillStyle = '#b7c6f6';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(w, gap);
+  ctx.lineTo(0, bottom);
+  ctx.lineTo(0, gap + radius * 0.08);
+  ctx.closePath();
+  ctx.fillStyle = '#7488d4';
+  ctx.fill();
+}
+
+function drawXrpMark(radius) {
+  ctx.strokeStyle = '#141414';
+  ctx.lineWidth = radius * 0.26;
+  ctx.lineCap = 'square';
+  ctx.beginPath();
+  ctx.moveTo(-radius * 0.7, -radius * 0.58);
+  ctx.quadraticCurveTo(0, radius * 0.22, radius * 0.7, -radius * 0.58);
   ctx.stroke();
-  ctx.restore();
-}
-
-function drawXi(radius) {
-  ctx.strokeStyle = '#f4f8ff';
-  ctx.lineWidth = Math.max(1.5, radius * 0.11);
-  ctx.lineCap = 'round';
-  const top = -radius * 0.34;
-  const bottom = radius * 0.34;
   ctx.beginPath();
-  ctx.moveTo(-radius * 0.24, top);
-  ctx.lineTo(radius * 0.26, top);
-  ctx.moveTo(-radius * 0.16, 0);
-  ctx.lineTo(radius * 0.18, 0);
-  ctx.moveTo(-radius * 0.24, bottom);
-  ctx.lineTo(radius * 0.26, bottom);
-  ctx.moveTo(-radius * 0.2, top);
-  ctx.lineTo(-radius * 0.02, bottom);
+  ctx.moveTo(-radius * 0.7, radius * 0.58);
+  ctx.quadraticCurveTo(0, -radius * 0.22, radius * 0.7, radius * 0.58);
   ctx.stroke();
 }
 
 function drawSolanaMark(radius) {
-  ctx.fillStyle = '#fff7f2';
-  for (let i = 0; i < 3; i += 1) {
-    const y = (i - 1) * radius * 0.3;
+  const rows = [
+    ['#49d7f8', '#1ee6b4'],
+    ['#8a6cf8', '#5aaef8'],
+    ['#c45cf2', '#8d78f6'],
+  ];
+  rows.forEach((pair, index) => {
+    const y = (index - 1) * radius * 0.26;
+    const gradient = ctx.createLinearGradient(-radius * 0.4, 0, radius * 0.4, 0);
+    gradient.addColorStop(0, pair[0]);
+    gradient.addColorStop(1, pair[1]);
+    ctx.fillStyle = gradient;
     ctx.beginPath();
-    ctx.moveTo(-radius * 0.32, y + radius * 0.08);
-    ctx.lineTo(radius * 0.18, y - radius * 0.08);
-    ctx.lineTo(radius * 0.32, y + radius * 0.02);
-    ctx.lineTo(-radius * 0.18, y + radius * 0.18);
+    ctx.moveTo(-radius * 0.4, y + radius * 0.07);
+    ctx.lineTo(radius * 0.26, y - radius * 0.05);
+    ctx.lineTo(radius * 0.4, y + radius * 0.02);
+    ctx.lineTo(-radius * 0.26, y + radius * 0.14);
     ctx.closePath();
     ctx.fill();
-  }
+  });
+}
+
+function drawDogeMark(radius) {
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath();
+  ctx.moveTo(-radius * 0.28, -radius * 0.4);
+  ctx.lineTo(-radius * 0.28, radius * 0.4);
+  ctx.lineTo(radius * 0.02, radius * 0.4);
+  ctx.arc(radius * 0.02, 0, radius * 0.4, Math.PI / 2, -Math.PI / 2, true);
+  ctx.closePath();
+  ctx.moveTo(-radius * 0.1, -radius * 0.18);
+  ctx.arc(radius * 0.04, 0, radius * 0.18, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(-radius * 0.1, radius * 0.18);
+  ctx.closePath();
+  ctx.fill('evenodd');
+  ctx.fillRect(-radius * 0.55, -radius * 0.08, radius * 0.5, radius * 0.16);
 }
 
 function drawBnbMark(radius) {
-  ctx.fillStyle = '#6a4008';
-  ctx.beginPath();
-  ctx.moveTo(0, -radius * 0.36);
-  ctx.lineTo(radius * 0.3, 0);
-  ctx.lineTo(0, radius * 0.36);
-  ctx.lineTo(-radius * 0.3, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#fff6d4';
-  ctx.beginPath();
-  ctx.moveTo(0, -radius * 0.18);
-  ctx.lineTo(radius * 0.14, 0);
-  ctx.lineTo(0, radius * 0.18);
-  ctx.lineTo(-radius * 0.14, 0);
-  ctx.closePath();
-  ctx.fill();
+  ctx.fillStyle = '#8a5a08';
+  const arm = radius * 0.16;
+  fillDiamond(0, 0, arm * 0.85);
+  fillDiamond(0, -radius * 0.34, arm);
+  fillDiamond(0, radius * 0.34, arm);
+  fillDiamond(-radius * 0.34, 0, arm * 0.72);
+  fillDiamond(radius * 0.34, 0, arm * 0.72);
 }
 
-function drawPlanet(x, y, radius, kind) {
-  const planet = planetById(kind);
+function drawCryptoMark(kind, radius) {
+  if (kind === 'eth') drawEthereumMark(radius);
+  else if (kind === 'xrp') drawXrpMark(radius);
+  else if (kind === 'sol') drawSolanaMark(radius);
+  else if (kind === 'doge') drawDogeMark(radius);
+  else if (kind === 'bnb') drawBnbMark(radius);
+  else drawBitcoinMark(radius);
+}
+
+function drawCryptoCoin(x, y, radius, kind) {
   ctx.save();
   ctx.translate(x, y);
-  if (planet.world === 'saturn') drawSaturnRings(radius, false);
-
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
   ctx.beginPath();
-  ctx.ellipse(2, radius * 0.95, radius * 0.72, radius * 0.2, 0, 0, Math.PI * 2);
+  ctx.ellipse(1, radius * 0.9, radius * 0.78, radius * 0.22, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  const body = ctx.createRadialGradient(-radius * 0.38, -radius * 0.42, radius * 0.08, radius * 0.2, radius * 0.12, radius);
-  body.addColorStop(0, planet.light);
-  body.addColorStop(0.5, planet.mid);
-  body.addColorStop(1, planet.dark);
-  ctx.fillStyle = body;
+  const rim = ctx.createRadialGradient(-radius * 0.35, -radius * 0.4, radius * 0.1, 0, 0, radius);
+  rim.addColorStop(0, '#fff6cf');
+  rim.addColorStop(0.45, '#f0c14b');
+  rim.addColorStop(0.78, '#c48a12');
+  rim.addColorStop(1, '#6e4210');
+  ctx.fillStyle = rim;
   ctx.beginPath();
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.save();
+  const face = ctx.createRadialGradient(-radius * 0.28, -radius * 0.32, radius * 0.05, 0, 0, radius * 0.72);
+  face.addColorStop(0, '#fff8dc');
+  face.addColorStop(0.55, '#f3c453');
+  face.addColorStop(1, '#c98400');
+  ctx.fillStyle = face;
   ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  ctx.clip();
-  if (planet.world === 'bands') {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
-    ctx.fillRect(-radius, -radius * 0.15, radius * 2, radius * 0.12);
-    ctx.fillStyle = 'rgba(10, 24, 48, 0.28)';
-    ctx.fillRect(-radius, radius * 0.22, radius * 2, radius * 0.16);
-  } else if (planet.world === 'mars') {
-    ctx.fillStyle = 'rgba(90, 16, 10, 0.45)';
-    ctx.beginPath();
-    ctx.ellipse(-radius * 0.15, radius * 0.12, radius * 0.38, radius * 0.22, -0.4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255, 236, 220, 0.85)';
-    ctx.beginPath();
-    ctx.ellipse(0, -radius * 0.72, radius * 0.34, radius * 0.16, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
+  ctx.arc(0, 0, radius * 0.74, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(110, 66, 16, 0.55)';
+  ctx.lineWidth = Math.max(1.1, radius * 0.06);
+  ctx.stroke();
 
-  if (planet.world === 'saturn') drawSaturnRings(radius, true);
-
-  ctx.fillStyle = planet.ink;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  if (planet.world === 'mars') drawSolanaMark(radius * 0.85);
-  else if (planet.world === 'bnb') drawBnbMark(radius);
-  else if (planet.world === 'bands') drawXi(radius);
-  else {
-    ctx.font = `800 ${Math.max(12, radius * 0.95)}px "Noto Sans", "Liberation Sans", sans-serif`;
-    ctx.fillText(planet.symbol, 0, radius * 0.04);
-  }
+  drawCryptoMark(kind, radius * 0.86);
   ctx.restore();
 }
 
@@ -1665,8 +1738,7 @@ function drawSceneLights() {
   const now = performance.now();
   collectibles.forEach((coin, index) => {
     const bob = Math.sin(now / 220 + index) * 3;
-    const planet = planetById(coin.kind);
-    drawGlow(coin.x, coin.y + bob, 86, planet.glow, 0.42);
+    drawGlow(coin.x, coin.y + bob, 78, '255, 196, 70', 0.4);
   });
 }
 
@@ -1674,7 +1746,7 @@ function drawPickups() {
   const now = performance.now();
   collectibles.forEach((coin, index) => {
     const bob = Math.sin(now / 220 + index) * 3;
-    drawPlanet(coin.x, coin.y + bob, coin.radius, coin.kind);
+    drawCryptoCoin(coin.x, coin.y + bob, coin.radius, coinById(coin.kind).id);
   });
 
   for (const power of powerups) {
@@ -2147,8 +2219,8 @@ if (import.meta.env.DEV) {
     },
     placeCoins(list) {
       collectibles = list.map((coin, index) => ({
-        radius: PLANET_RADIUS,
-        kind: PLANETS[index % PLANETS.length].id,
+        radius: COIN_RADIUS,
+        kind: COINS[index % COINS.length].id,
         ...coin,
       }));
     },

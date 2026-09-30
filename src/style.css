@@ -1,12 +1,16 @@
 :root {
   --bg-color: #05060c;
-  --panel-bg: rgba(16, 20, 34, 0.94);
-  --accent: #00f0ff;
-  --accent-glow: rgba(0, 240, 255, 0.4);
-  --secondary: #ff0055;
+  --panel-bg: rgba(14, 16, 24, 0.94);
+  --gold: #f0c14b;
+  --gold-deep: #c48a12;
+  --blue: #3d8bff;
+  --accent: var(--blue);
+  --accent-glow: rgba(61, 139, 255, 0.38);
+  --gold-glow: rgba(240, 193, 75, 0.45);
+  --secondary: var(--gold);
   --text-main: #ffffff;
-  --text-muted: #8c92b3;
-  --border: rgba(255, 255, 255, 0.1);
+  --text-muted: #9aa3be;
+  --border: rgba(240, 193, 75, 0.18);
   color-scheme: dark;
 }
 
@@ -99,14 +103,26 @@ body {
   background: rgba(13, 15, 24, 0.86);
 }
 
-#main-menu h1 {
+.logo {
+  letter-spacing: -0.04em;
+  text-shadow: none;
   animation: title-glow 2.8s ease-in-out infinite;
+}
+
+.logo-crypto {
+  color: var(--gold);
+  text-shadow: 0 0 18px var(--gold-glow);
+}
+
+.logo-verse {
+  color: var(--blue);
+  text-shadow: 0 0 18px var(--accent-glow);
 }
 
 @keyframes title-glow {
   0%,
-  100% { text-shadow: 0 0 16px var(--accent-glow); }
-  50% { text-shadow: 0 0 28px var(--accent-glow), 0 0 52px rgba(0, 240, 255, 0.28); }
+  100% { filter: drop-shadow(0 0 10px rgba(240, 193, 75, 0.25)); }
+  50% { filter: drop-shadow(0 0 16px rgba(61, 139, 255, 0.45)); }
 }
 
 #shop-screen {
@@ -118,15 +134,15 @@ body {
 h1 {
   font-size: clamp(2rem, 8vw, 3rem);
   font-weight: 900;
-  letter-spacing: 4px;
-  color: var(--accent);
-  text-shadow: 0 0 20px var(--accent-glow);
+  letter-spacing: 1px;
+  color: var(--gold);
+  text-shadow: 0 0 20px var(--gold-glow);
   margin-bottom: 8px;
 }
 
 #game-over-screen h1 {
-  color: var(--secondary);
-  text-shadow: 0 0 20px rgba(255, 0, 85, 0.45);
+  color: var(--blue);
+  text-shadow: 0 0 20px var(--accent-glow);
   letter-spacing: 1px;
 }
 
@@ -139,7 +155,7 @@ h1 {
 }
 
 .best {
-  color: var(--accent);
+  color: var(--gold);
   font-weight: 700;
   font-size: 0.92rem;
   margin-bottom: 28px;
@@ -148,15 +164,15 @@ h1 {
 }
 
 .btn {
-  background: linear-gradient(135deg, var(--accent), #0088ff);
-  color: #041018;
+  background: linear-gradient(135deg, #ffe7a3, var(--gold) 45%, var(--gold-deep));
+  color: #1a1204;
   border: none;
   padding: 14px 36px;
   font-size: 1.05rem;
   font-weight: 800;
   border-radius: 30px;
   cursor: pointer;
-  box-shadow: 0 0 20px var(--accent-glow);
+  box-shadow: 0 0 20px var(--gold-glow);
   transition: transform 0.1s, box-shadow 0.2s;
   margin: 8px;
   width: 80%;
@@ -171,7 +187,7 @@ h1 {
 
 .btn:focus-visible,
 .shop-item:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--gold);
   outline-offset: 3px;
 }
 
@@ -183,8 +199,8 @@ h1 {
 
 .btn-secondary {
   background: transparent;
-  color: var(--text-main);
-  border: 2px solid var(--border);
+  color: #d7e6ff;
+  border: 2px solid var(--blue);
   box-shadow: none;
 }
 
@@ -242,8 +258,8 @@ h1 {
   font-size: 1.05rem;
   font-weight: 700;
   margin-bottom: 12px;
-  color: var(--accent);
-  border-bottom: 1px solid var(--border);
+  color: var(--gold);
+  border-bottom: 1px solid rgba(61, 139, 255, 0.35);
   padding-bottom: 6px;
 }
 
@@ -302,13 +318,13 @@ h1 {
 }
 
 .shop-item.selected {
-  border-color: var(--accent);
-  background: var(--accent-glow);
+  border-color: var(--gold);
+  background: rgba(240, 193, 75, 0.16);
 }
 
 .shop-item.trying {
-  border-color: #ffbb00;
-  box-shadow: inset 0 0 0 1px rgba(255, 187, 0, 0.55);
+  border-color: var(--blue);
+  box-shadow: inset 0 0 0 1px rgba(61, 139, 255, 0.55);
 }
 
 .try-caption {
