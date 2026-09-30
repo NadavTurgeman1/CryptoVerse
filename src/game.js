@@ -40,7 +40,7 @@ const GLASSES = [
 ];
 
 const SHOP = { color: COLORS, hat: HATS, glasses: GLASSES };
-const COIN_RADIUS = 16;
+const COIN_RADIUS = 20;
 const COINS = [
   { id: 'btc' },
   { id: 'eth' },
@@ -1538,141 +1538,246 @@ function fillDiamond(x, y, size) {
   ctx.fill();
 }
 
+function quadPoint(start, control, end, t) {
+  const u = 1 - t;
+  return {
+    x: u * u * start.x + 2 * u * t * control.x + t * t * end.x,
+    y: u * u * start.y + 2 * u * t * control.y + t * t * end.y,
+  };
+}
+
+function quadTangent(start, control, end, t) {
+  const u = 1 - t;
+  return {
+    x: 2 * u * (control.x - start.x) + 2 * t * (end.x - control.x),
+    y: 2 * u * (control.y - start.y) + 2 * t * (end.y - control.y),
+  };
+}
+
+function fillRibbon(start, control, end, half) {
+  const steps = 12;
+  const left = [];
+  const right = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const t = i / steps;
+    const point = quadPoint(start, control, end, t);
+    const tangent = quadTangent(start, control, end, t);
+    const length = Math.hypot(tangent.x, tangent.y) || 1;
+    const nx = (-tangent.y / length) * half;
+    const ny = (tangent.x / length) * half;
+    left.push([point.x + nx, point.y + ny]);
+    right.push([point.x - nx, point.y - ny]);
+  }
+  ctx.beginPath();
+  ctx.moveTo(left[0][0], left[0][1]);
+  left.forEach(([x, y]) => ctx.lineTo(x, y));
+  for (let i = right.length - 1; i >= 0; i -= 1) ctx.lineTo(right[i][0], right[i][1]);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function paintBitcoin(radius, color) {
+  const r = radius * 0.78;
+  ctx.fillStyle = color;
+  ctx.fillRect(-r * 0.18, -r * 0.7, r * 0.12, r * 1.4);
+  ctx.fillRect(r * 0.04, -r * 0.7, r * 0.12, r * 1.4);
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.38, -r * 0.46);
+  ctx.lineTo(r * 0.02, -r * 0.46);
+  ctx.arc(r * 0.02, -r * 0.23, r * 0.23, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(-r * 0.38, 0);
+  ctx.closePath();
+  ctx.moveTo(-r * 0.16, -r * 0.34);
+  ctx.lineTo(-r * 0.02, -r * 0.34);
+  ctx.arc(-r * 0.02, -r * 0.23, r * 0.11, -Math.PI / 2, Math.PI / 2, true);
+  ctx.lineTo(-r * 0.16, -r * 0.12);
+  ctx.closePath();
+  ctx.fill('evenodd');
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.38, r * 0.04);
+  ctx.lineTo(r * 0.06, r * 0.04);
+  ctx.arc(r * 0.06, r * 0.26, r * 0.26, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(-r * 0.38, r * 0.52);
+  ctx.closePath();
+  ctx.moveTo(-r * 0.16, r * 0.14);
+  ctx.lineTo(r * 0.02, r * 0.14);
+  ctx.arc(r * 0.02, r * 0.26, r * 0.12, -Math.PI / 2, Math.PI / 2, true);
+  ctx.lineTo(-r * 0.16, r * 0.38);
+  ctx.closePath();
+  ctx.fill('evenodd');
+}
+
 function drawBitcoinMark(radius) {
-  const r = radius * 0.72;
-  ctx.fillStyle = '#c45f00';
-  ctx.fillRect(-r * 0.34, -r * 0.62, r * 0.13, r * 1.24);
-  ctx.fillRect(-r * 0.1, -r * 0.62, r * 0.13, r * 1.24);
+  ctx.save();
+  ctx.translate(radius * 0.045, radius * 0.06);
+  paintBitcoin(radius, '#7a3404');
+  ctx.restore();
+  const metal = ctx.createLinearGradient(-radius, -radius, radius * 0.4, radius);
+  metal.addColorStop(0, '#ffc56a');
+  metal.addColorStop(0.42, '#f7931a');
+  metal.addColorStop(1, '#c45c00');
+  paintBitcoin(radius, metal);
+}
+
+function traceFacet(points) {
   ctx.beginPath();
-  ctx.moveTo(-r * 0.42, -r * 0.4);
-  ctx.lineTo(r * 0.02, -r * 0.4);
-  ctx.arc(r * 0.02, -r * 0.2, r * 0.2, -Math.PI / 2, Math.PI / 2);
-  ctx.lineTo(-r * 0.42, 0);
+  ctx.moveTo(points[0][0], points[0][1]);
+  points.slice(1).forEach(([x, y]) => ctx.lineTo(x, y));
   ctx.closePath();
-  ctx.moveTo(-r * 0.42, 0);
-  ctx.lineTo(r * 0.06, 0);
-  ctx.arc(r * 0.06, r * 0.22, r * 0.22, -Math.PI / 2, Math.PI / 2);
-  ctx.lineTo(-r * 0.42, r * 0.44);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#f6d27a';
-  ctx.beginPath();
-  ctx.arc(r * 0.02, -r * 0.2, r * 0.09, 0, Math.PI * 2);
-  ctx.arc(r * 0.06, r * 0.22, r * 0.1, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 function drawEthereumMark(radius) {
-  const w = radius * 0.5;
-  const top = -radius * 0.52;
-  const waist = -radius * 0.02;
-  const notch = radius * 0.1;
-  const gap = radius * 0.24;
-  const bottom = radius * 0.56;
-  ctx.beginPath();
-  ctx.moveTo(0, top);
-  ctx.lineTo(-w, waist);
-  ctx.lineTo(0, notch);
-  ctx.closePath();
-  ctx.fillStyle = '#c5d2fb';
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(0, top);
-  ctx.lineTo(w, waist);
-  ctx.lineTo(0, notch);
-  ctx.closePath();
-  ctx.fillStyle = '#7f93e0';
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(-w, waist);
-  ctx.lineTo(0, notch + radius * 0.14);
-  ctx.lineTo(0, notch);
-  ctx.closePath();
-  ctx.fillStyle = '#a9b9f2';
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(w, waist);
-  ctx.lineTo(0, notch + radius * 0.14);
-  ctx.lineTo(0, notch);
-  ctx.closePath();
-  ctx.fillStyle = '#6278c8';
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(-w, gap);
-  ctx.lineTo(0, bottom);
-  ctx.lineTo(0, gap + radius * 0.08);
-  ctx.closePath();
-  ctx.fillStyle = '#b7c6f6';
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(w, gap);
-  ctx.lineTo(0, bottom);
-  ctx.lineTo(0, gap + radius * 0.08);
-  ctx.closePath();
-  ctx.fillStyle = '#7488d4';
-  ctx.fill();
+  const w = radius * 0.52;
+  const top = -radius * 0.58;
+  const waist = -radius * 0.04;
+  const notch = radius * 0.12;
+  const under = radius * 0.22;
+  const gap = radius * 0.3;
+  const bottom = radius * 0.62;
+  const faces = [
+    [[0, top], [-w, waist], [0, notch], '#d5defc', '#9aafef'],
+    [[0, top], [w, waist], [0, notch], '#8ea2e6', '#5d74c4'],
+    [[-w, waist], [0, under], [0, notch], '#c3d0f8', '#8ea4e4'],
+    [[w, waist], [0, under], [0, notch], '#6f86d4', '#4c63b4'],
+    [[-w, gap], [0, bottom], [0, gap + radius * 0.1], '#c9d4f8', '#93a8ea'],
+    [[w, gap], [0, bottom], [0, gap + radius * 0.1], '#7d92dc', '#556db8'],
+  ];
+  ctx.save();
+  ctx.translate(radius * 0.03, radius * 0.05);
+  ctx.globalAlpha = 0.28;
+  faces.forEach((face) => {
+    traceFacet(face.slice(0, 3));
+    ctx.fillStyle = '#1d2a55';
+    ctx.fill();
+  });
+  ctx.restore();
+  faces.forEach((face) => {
+    const [a, b, c, light, shade] = face;
+    traceFacet([a, b, c]);
+    const gradient = ctx.createLinearGradient(a[0], a[1], c[0], b[1]);
+    gradient.addColorStop(0, light);
+    gradient.addColorStop(1, shade);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(28, 42, 92, 0.35)';
+    ctx.lineWidth = Math.max(0.6, radius * 0.03);
+    ctx.stroke();
+  });
 }
 
 function drawXrpMark(radius) {
-  ctx.strokeStyle = '#141414';
-  ctx.lineWidth = radius * 0.26;
-  ctx.lineCap = 'square';
-  ctx.beginPath();
-  ctx.moveTo(-radius * 0.7, -radius * 0.58);
-  ctx.quadraticCurveTo(0, radius * 0.22, radius * 0.7, -radius * 0.58);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(-radius * 0.7, radius * 0.58);
-  ctx.quadraticCurveTo(0, -radius * 0.22, radius * 0.7, radius * 0.58);
-  ctx.stroke();
+  const bands = [
+    [{ x: -radius * 0.62, y: -radius * 0.5 }, { x: 0, y: radius * 0.16 }, { x: radius * 0.62, y: -radius * 0.5 }],
+    [{ x: -radius * 0.62, y: radius * 0.5 }, { x: 0, y: -radius * 0.16 }, { x: radius * 0.62, y: radius * 0.5 }],
+  ];
+  bands.forEach(([start, control, end]) => {
+    ctx.save();
+    ctx.translate(radius * 0.03, radius * 0.045);
+    ctx.fillStyle = 'rgba(20, 12, 4, 0.45)';
+    fillRibbon(start, control, end, radius * 0.15);
+    ctx.restore();
+    const ink = ctx.createLinearGradient(start.x, start.y, end.x, end.y + radius * 0.2);
+    ink.addColorStop(0, '#3a2a18');
+    ink.addColorStop(0.45, '#14110e');
+    ink.addColorStop(1, '#2a2118');
+    ctx.fillStyle = ink;
+    fillRibbon(start, control, end, radius * 0.16);
+  });
 }
 
 function drawSolanaMark(radius) {
   const rows = [
-    ['#49d7f8', '#1ee6b4'],
-    ['#8a6cf8', '#5aaef8'],
-    ['#c45cf2', '#8d78f6'],
+    ['#7ae7ff', '#3ef0c2'],
+    ['#b08cff', '#6eb6ff'],
+    ['#e56bff', '#9b86ff'],
   ];
   rows.forEach((pair, index) => {
-    const y = (index - 1) * radius * 0.26;
-    const gradient = ctx.createLinearGradient(-radius * 0.4, 0, radius * 0.4, 0);
+    const y = (index - 1) * radius * 0.3;
+    const h = radius * 0.15;
+    const skew = radius * 0.16;
+    const left = -radius * 0.48;
+    const right = radius * 0.48;
+    const points = [
+      [left, y + h],
+      [left + skew, y],
+      [right, y],
+      [right - skew, y + h],
+    ];
+    ctx.save();
+    ctx.translate(radius * 0.03, radius * 0.04);
+    traceFacet(points);
+    ctx.fillStyle = 'rgba(18, 10, 40, 0.4)';
+    ctx.fill();
+    ctx.restore();
+    traceFacet(points);
+    const gradient = ctx.createLinearGradient(left, y, right, y + h);
     gradient.addColorStop(0, pair[0]);
     gradient.addColorStop(1, pair[1]);
     ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.moveTo(-radius * 0.4, y + radius * 0.07);
-    ctx.lineTo(radius * 0.26, y - radius * 0.05);
-    ctx.lineTo(radius * 0.4, y + radius * 0.02);
-    ctx.lineTo(-radius * 0.26, y + radius * 0.14);
-    ctx.closePath();
     ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(points[1][0], points[1][1]);
+    ctx.lineTo(points[2][0], points[2][1]);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.lineWidth = Math.max(0.7, radius * 0.035);
+    ctx.stroke();
   });
 }
 
 function drawDogeMark(radius) {
-  ctx.fillStyle = '#1a1a1a';
-  ctx.beginPath();
-  ctx.moveTo(-radius * 0.28, -radius * 0.4);
-  ctx.lineTo(-radius * 0.28, radius * 0.4);
-  ctx.lineTo(radius * 0.02, radius * 0.4);
-  ctx.arc(radius * 0.02, 0, radius * 0.4, Math.PI / 2, -Math.PI / 2, true);
-  ctx.closePath();
-  ctx.moveTo(-radius * 0.1, -radius * 0.18);
-  ctx.arc(radius * 0.04, 0, radius * 0.18, -Math.PI / 2, Math.PI / 2);
-  ctx.lineTo(-radius * 0.1, radius * 0.18);
-  ctx.closePath();
-  ctx.fill('evenodd');
-  ctx.fillRect(-radius * 0.55, -radius * 0.08, radius * 0.5, radius * 0.16);
+  const paint = (color) => {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(-radius * 0.22, -radius * 0.46);
+    ctx.lineTo(-radius * 0.22, radius * 0.46);
+    ctx.lineTo(radius * 0.02, radius * 0.46);
+    ctx.arc(radius * 0.02, 0, radius * 0.46, Math.PI / 2, -Math.PI / 2, true);
+    ctx.closePath();
+    ctx.moveTo(-radius * 0.04, -radius * 0.2);
+    ctx.arc(radius * 0.04, 0, radius * 0.2, -Math.PI / 2, Math.PI / 2);
+    ctx.lineTo(-radius * 0.04, radius * 0.2);
+    ctx.closePath();
+    ctx.fill('evenodd');
+    ctx.fillRect(-radius * 0.5, -radius * 0.07, radius * 0.42, radius * 0.14);
+  };
+  ctx.save();
+  ctx.translate(radius * 0.04, radius * 0.05);
+  paint('#120e08');
+  ctx.restore();
+  paint('#1c140c');
 }
 
 function drawBnbMark(radius) {
-  ctx.fillStyle = '#8a5a08';
-  const arm = radius * 0.16;
-  fillDiamond(0, 0, arm * 0.85);
-  fillDiamond(0, -radius * 0.34, arm);
-  fillDiamond(0, radius * 0.34, arm);
-  fillDiamond(-radius * 0.34, 0, arm * 0.72);
-  fillDiamond(radius * 0.34, 0, arm * 0.72);
+  const core = radius * 0.14;
+  const arm = radius * 0.2;
+  const reach = core + arm + radius * 0.07;
+  const pieces = [
+    [0, 0, core],
+    [0, -reach, arm],
+    [0, reach, arm],
+    [-reach, 0, core],
+    [reach, 0, core],
+  ];
+  ctx.save();
+  ctx.translate(radius * 0.03, radius * 0.04);
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = '#3a1e06';
+  pieces.forEach(([x, y, size]) => fillDiamond(x, y, size));
+  ctx.restore();
+  pieces.forEach(([x, y, size]) => {
+    traceFacet([
+      [x, y - size],
+      [x + size, y],
+      [x, y + size],
+      [x - size, y],
+    ]);
+    const face = ctx.createLinearGradient(x, y - size, x, y + size);
+    face.addColorStop(0, '#ffe29a');
+    face.addColorStop(0.55, '#e39b16');
+    face.addColorStop(1, '#8a4e0a');
+    ctx.fillStyle = face;
+    ctx.fill();
+  });
 }
 
 function drawCryptoMark(kind, radius) {
@@ -1687,34 +1792,80 @@ function drawCryptoMark(kind, radius) {
 function drawCryptoCoin(x, y, radius, kind) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
   ctx.beginPath();
-  ctx.ellipse(1, radius * 0.9, radius * 0.78, radius * 0.22, 0, 0, Math.PI * 2);
+  ctx.ellipse(1, radius * 1.02, radius * 0.86, radius * 0.26, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  const rim = ctx.createRadialGradient(-radius * 0.35, -radius * 0.4, radius * 0.1, 0, 0, radius);
+  ctx.fillStyle = '#4e2c0a';
+  ctx.beginPath();
+  ctx.arc(0, radius * 0.1, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  const rim = ctx.createLinearGradient(-radius, -radius, radius * 0.8, radius);
   rim.addColorStop(0, '#fff6cf');
-  rim.addColorStop(0.45, '#f0c14b');
-  rim.addColorStop(0.78, '#c48a12');
-  rim.addColorStop(1, '#6e4210');
+  rim.addColorStop(0.28, '#f2c85a');
+  rim.addColorStop(0.62, '#c88816');
+  rim.addColorStop(1, '#6a3a0c');
   ctx.fillStyle = rim;
   ctx.beginPath();
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.fill();
 
-  const face = ctx.createRadialGradient(-radius * 0.28, -radius * 0.32, radius * 0.05, 0, 0, radius * 0.72);
-  face.addColorStop(0, '#fff8dc');
-  face.addColorStop(0.55, '#f3c453');
-  face.addColorStop(1, '#c98400');
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 0.96, 0, Math.PI * 2);
+  ctx.arc(0, 0, radius * 0.8, 0, Math.PI * 2, true);
+  ctx.clip('evenodd');
+  ctx.strokeStyle = 'rgba(74, 38, 8, 0.55)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 36; i += 1) {
+    const angle = (i / 36) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(angle) * radius * 0.78, Math.sin(angle) * radius * 0.78);
+    ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const face = ctx.createRadialGradient(-radius * 0.32, -radius * 0.38, radius * 0.04, radius * 0.1, radius * 0.16, radius * 0.78);
+  face.addColorStop(0, '#fff8e2');
+  face.addColorStop(0.38, '#f6d36a');
+  face.addColorStop(0.78, '#e0a31c');
+  face.addColorStop(1, '#a86c08');
   ctx.fillStyle = face;
   ctx.beginPath();
   ctx.arc(0, 0, radius * 0.74, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(110, 66, 16, 0.55)';
-  ctx.lineWidth = Math.max(1.1, radius * 0.06);
+
+  ctx.strokeStyle = 'rgba(92, 52, 8, 0.55)';
+  ctx.lineWidth = Math.max(1, radius * 0.045);
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 0.68, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255, 244, 206, 0.7)';
+  ctx.lineWidth = Math.max(0.6, radius * 0.02);
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 0.64, 0, Math.PI * 2);
   ctx.stroke();
 
-  drawCryptoMark(kind, radius * 0.86);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 0.66, 0, Math.PI * 2);
+  ctx.clip();
+  drawCryptoMark(kind, radius);
+  ctx.restore();
+
+  ctx.strokeStyle = 'rgba(255, 250, 230, 0.75)';
+  ctx.lineWidth = Math.max(1, radius * 0.07);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 0.88, Math.PI * 1.15, Math.PI * 1.72);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+  ctx.beginPath();
+  ctx.arc(-radius * 0.42, -radius * 0.38, Math.max(0.8, radius * 0.045), 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
