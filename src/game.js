@@ -966,7 +966,7 @@ function drawDragReticle() {
 function drawMenuBackdrop() {
   const time = performance.now() / 1000;
   const cx = view.w / 2;
-  const cy = view.h * 0.72;
+  const cy = view.h * 0.5;
   drawRibbon(
     Array.from({ length: 28 }, (_, index) => {
       const angle = time * 0.7 + index * 0.22;
