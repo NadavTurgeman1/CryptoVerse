@@ -45,8 +45,13 @@ const GLASSES = [
 
 const SHOP = { color: COLORS, hat: HATS, glasses: GLASSES };
 const POWERS = [
-  { id: 'missile', name: 'Stored missile', price: 160, detail: 'Fire one any time. Removes the oldest echo.' },
-  { id: 'shield', name: 'Unlimited shield', price: 280, detail: 'Turn it on once. It lasts the rest of the run.' },
+  { id: 'missile', name: 'Stored missile', price: 130, detail: 'Fire one any time. Removes the oldest echo.' },
+  {
+    id: 'shield',
+    name: 'Stored shield',
+    price: 220,
+    detail: 'No timer. It blocks the next hit, then drops. Extra shields add another ring.',
+  },
 ];
 const PLAY_BOTTOM = 46;
 const COIN_RADIUS = 20;
@@ -150,7 +155,7 @@ let bestRound = 0;
 let gamesPlayed = 0;
 let missileStock = 0;
 let shieldStock = 0;
-let shieldForever = false;
+let shieldLayers = [];
 
 const player = { x: 240, y: 400, radius: 14, targetX: 240, targetY: 400, vx: 0, vy: 0 };
 let echoes = [];
@@ -158,8 +163,6 @@ let currentPath = [];
 let collectibles = [];
 let powerups = [];
 let particles = [];
-let activePowerup = null;
-let powerupTimer = 0;
 let missile = null;
 let impacts = [];
 let grace = 0;
@@ -324,16 +327,20 @@ function syncHUD() {
   setText('round-val', currentRound);
   setText('coins-val', coins);
   setText('wallet-val', coins);
-  const status = shieldForever
-    ? 'Shield'
-    : activePowerup === 'SHIELD'
-      ? `Shield ${Math.ceil(powerupTimer / 60)}s`
-      : 'None';
-  setText('powerup-status', status);
+  setText('powerup-status', shieldStatus());
   setText('missile-stock', missileStock);
   setText('shield-stock', shieldStock);
   document.getElementById('use-missile')?.classList.toggle('empty', missileStock <= 0);
-  document.getElementById('use-shield')?.classList.toggle('empty', shieldStock <= 0 || shieldForever);
+  document.getElementById('use-shield')?.classList.toggle('empty', shieldStock <= 0);
+}
+
+function shieldStatus() {
+  if (!shieldLayers.length) return 'None';
+  const label = shieldLayers.length > 1 ? `Shield ×${shieldLayers.length}` : 'Shield';
+  const timed = shieldLayers.filter((layer) => layer.kind === 'timed');
+  if (!timed.length) return label;
+  const soonest = Math.min(...timed.map((layer) => layer.life));
+  return `${label} ${Math.ceil(soonest / 60)}s`;
 }
 
 function syncMenu() {
@@ -581,10 +588,6 @@ function useStoredMissile() {
 
 function useStoredShield() {
   if (gameState !== 'PLAYING') return false;
-  if (shieldForever) {
-    showToast('Shield is already up');
-    return false;
-  }
   const next = spendCharge(shieldStock);
   if (next.status === 'empty') {
     AudioEngine.deny();
@@ -592,12 +595,10 @@ function useStoredShield() {
     return false;
   }
   shieldStock = next.stock;
-  shieldForever = true;
-  activePowerup = 'SHIELD';
-  powerupTimer = 0;
+  addShieldLayer('lasting');
   saveAll();
   AudioEngine.powerup();
-  showToast('Unlimited shield');
+  showToast(shieldLayers.length > 1 ? `Shield ×${shieldLayers.length}` : 'Shield up');
   syncHUD();
   return true;
 }
@@ -806,10 +807,8 @@ function startGame() {
   particles = [];
   missile = null;
   impacts = [];
-  activePowerup = null;
-  powerupTimer = 0;
+  shieldLayers = [];
   grace = 0;
-  shieldForever = false;
   roundFrame = 0;
   skipFrameTick = false;
   shake = 0;
@@ -893,10 +892,7 @@ function applyPowerup(power) {
   const color = power.type === 'SHIELD' ? '#00f0ff' : power.type === 'MISSILE' ? '#ff5a1f' : '#ffbb00';
   burst(power.x, power.y, color);
   if (power.type === 'SHIELD') {
-    if (!shieldForever) {
-      activePowerup = 'SHIELD';
-      powerupTimer = SHIELD_FRAMES;
-    }
+    addShieldLayer('timed');
     AudioEngine.powerup();
     return;
   }
@@ -1060,13 +1056,31 @@ function stepParticles() {
   }
 }
 
+function addShieldLayer(kind) {
+  if (kind === 'lasting') shieldLayers.push({ kind: 'lasting' });
+  else shieldLayers.push({ kind: 'timed', life: SHIELD_FRAMES });
+}
+
 function tickShield() {
-  if (shieldForever || powerupTimer <= 0) return;
-  powerupTimer -= 1;
-  if (powerupTimer === 0) {
-    activePowerup = null;
-    grace = Math.max(grace, SHIELD_END_GRACE);
+  if (!shieldLayers.length) return;
+  let removed = false;
+  for (let i = shieldLayers.length - 1; i >= 0; i -= 1) {
+    const layer = shieldLayers[i];
+    if (layer.kind !== 'timed') continue;
+    layer.life -= 1;
+    if (layer.life <= 0) {
+      shieldLayers.splice(i, 1);
+      removed = true;
+    }
   }
+  if (removed && shieldLayers.length === 0) grace = Math.max(grace, SHIELD_END_GRACE);
+}
+
+function absorbShieldHit() {
+  shieldLayers.pop();
+  grace = Math.max(grace, SHIELD_END_GRACE);
+  burst(player.x, player.y, '#7af6ff');
+  AudioEngine.play(240, 'triangle', 0.12);
 }
 
 function update() {
@@ -1080,10 +1094,12 @@ function update() {
   tickShield();
   stepParticles();
 
-  const vulnerable = grace <= 0 && activePowerup !== 'SHIELD';
-  if (hitsEcho(player, echoes, ghostFrame(), player.radius * 2 - 8, vulnerable)) {
-    gameOver();
-    return;
+  if (grace <= 0 && hitsEcho(player, echoes, ghostFrame(), player.radius * 2 - 8, true)) {
+    if (shieldLayers.length > 0) absorbShieldHit();
+    else {
+      gameOver();
+      return;
+    }
   }
 
   if (grace > 0) grace -= 1;
@@ -1094,9 +1110,7 @@ function update() {
 }
 
 function gameOver() {
-  shieldForever = false;
-  activePowerup = null;
-  powerupTimer = 0;
+  shieldLayers = [];
   AudioEngine.hit();
   shake = 14;
   const hadRecord = bestScore > 0 || bestRound > 0;
@@ -2164,19 +2178,54 @@ function drawMissile() {
   }
 }
 
+function drawGoldBar(x, y, w, h, depth) {
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 0.7;
+  ctx.strokeStyle = '#6a3e08';
+
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x + w, y + h);
+  ctx.lineTo(x, y + h);
+  ctx.closePath();
+  ctx.fillStyle = '#e8ae22';
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + depth, y - depth);
+  ctx.lineTo(x + w + depth, y - depth);
+  ctx.lineTo(x + w, y);
+  ctx.closePath();
+  ctx.fillStyle = '#fff0b8';
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(x + w, y);
+  ctx.lineTo(x + w + depth, y - depth);
+  ctx.lineTo(x + w + depth, y + h - depth);
+  ctx.lineTo(x + w, y + h);
+  ctx.closePath();
+  ctx.fillStyle = '#9a5e0c';
+  ctx.fill();
+  ctx.stroke();
+}
+
 function drawBonusIcon(x, y) {
   ctx.save();
-  ctx.fillStyle = '#ffbb00';
-  ctx.shadowColor = '#ffbb00';
-  ctx.shadowBlur = 12;
+  ctx.fillStyle = 'rgba(240, 193, 75, 0.18)';
   ctx.beginPath();
-  ctx.arc(x, y, 11, 0, Math.PI * 2);
+  ctx.arc(x, y, 16, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#1a1400';
-  ctx.font = '800 16px system-ui, "DejaVu Sans", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('+', x, y + 1);
+  const w = 13;
+  const h = 4.4;
+  const depth = 4.2;
+  for (let i = 0; i < 3; i += 1) {
+    drawGoldBar(x - w / 2 - depth * 0.55, y + 8 - i * 6.4, w, h, depth);
+  }
   ctx.restore();
 }
 
@@ -2193,26 +2242,40 @@ function drawPlayer() {
   const speed = Math.hypot(player.vx, player.vy);
   drawFireball(player.x, player.y, 20, phase, flickering ? 0.45 : 1, speed < 0.35 ? null : fireHeading());
 
-  if (activePowerup !== 'SHIELD' && grace <= 0) return;
+  if (grace <= 0 && shieldLayers.length === 0) return;
   ctx.save();
   const spin = performance.now() / 260;
-  const ring = activePowerup === 'SHIELD' ? '#7af6ff' : 'rgba(255,255,255,0.75)';
-  ctx.strokeStyle = ring;
   ctx.lineWidth = 1.6;
-  ctx.globalAlpha = activePowerup === 'SHIELD' ? 0.85 : 0.45;
-  ctx.beginPath();
-  ctx.arc(player.x, player.y, 28, spin, spin + Math.PI * 1.35);
-  ctx.stroke();
-  if (activePowerup === 'SHIELD') {
+  if (grace > 0) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, 24, spin, spin + Math.PI * 1.35);
+    ctx.stroke();
+  }
+  shieldLayers.forEach((layer, index) => {
+    const radius = 30 + index * 8;
+    const start = spin + index * 0.7;
+    ctx.strokeStyle = layer.kind === 'lasting' ? '#d8fbff' : '#7af6ff';
+    ctx.globalAlpha = layer.kind === 'lasting' ? 0.95 : 0.72;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, radius, start, start + Math.PI * 1.45);
+    ctx.stroke();
     for (let i = 0; i < 3; i += 1) {
-      const angle = spin + (i * Math.PI * 2) / 3;
+      const angle = start + (i * Math.PI * 2) / 3;
       ctx.fillStyle = '#e8fdff';
       ctx.globalAlpha = 0.9;
       ctx.beginPath();
-      ctx.arc(player.x + Math.cos(angle) * 28, player.y + Math.sin(angle) * 16, 2.2, 0, Math.PI * 2);
+      ctx.arc(
+        player.x + Math.cos(angle) * radius,
+        player.y + Math.sin(angle) * (radius * 0.56),
+        2.1,
+        0,
+        Math.PI * 2,
+      );
       ctx.fill();
     }
-  }
+  });
   ctx.restore();
 }
 
@@ -2358,19 +2421,25 @@ function hexAlpha(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+let simFrozen = false;
+
 function frame(now) {
   if (view.w < 2 || view.h < 2) resizeCanvas();
   if (!lastTime) lastTime = now;
   const delta = Math.min(100, now - lastTime);
   lastTime = now;
-  accumulator += delta;
-  let steps = 0;
-  while (accumulator >= STEP && steps < 5) {
-    update();
-    accumulator -= STEP;
-    steps += 1;
+  if (!simFrozen) {
+    accumulator += delta;
+    let steps = 0;
+    while (accumulator >= STEP && steps < 5) {
+      update();
+      accumulator -= STEP;
+      steps += 1;
+    }
+    if (steps === 5) accumulator = 0;
+  } else {
+    accumulator = 0;
   }
-  if (steps === 5) accumulator = 0;
   draw();
   if (!document.getElementById('shop-screen').classList.contains('hidden')) renderPreview();
   requestAnimationFrame(frame);
@@ -2551,12 +2620,20 @@ if (import.meta.env.DEV) {
       saveAll();
       syncHUD();
     },
-    placeEcho(path) {
+    placeEcho(path, options) {
       echoes = [path.map((point) => ({ ...point }))];
       roundFrame = 0;
       grace = 0;
-      activePowerup = null;
-      powerupTimer = 0;
+      if (!options?.keepShields) shieldLayers = [];
+    },
+    freeze(on) {
+      simFrozen = Boolean(on);
+      accumulator = 0;
+    },
+    step(count = 1) {
+      const n = Math.max(0, Math.floor(count) || 0);
+      for (let i = 0; i < n; i += 1) update();
+      draw();
     },
     setRound(round) {
       currentRound = round;
@@ -2576,13 +2653,13 @@ if (import.meta.env.DEV) {
       missile: missile ? { x: missile.x, y: missile.y, trail: missile.trail.length } : null,
       collectibles: collectibles.map((coin) => ({ ...coin })),
       powerups: powerups.map((power) => ({ ...power })),
-      activePowerup,
-      powerupTimer,
+      shieldLayers: shieldLayers.map((layer) =>
+        layer.kind === 'timed' ? { kind: 'timed', life: layer.life } : { kind: 'lasting' },
+      ),
       grace,
       roundFrame,
       missileStock,
       shieldStock,
-      shieldForever,
       pressure: roundPressure(currentRound),
       ghost: echoes[0]?.length ? { ...ghostPoint(echoes[0], ghostFrame()) } : null,
       player: { x: player.x, y: player.y, targetX: player.targetX, targetY: player.targetY, radius: player.radius },

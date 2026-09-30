@@ -24,8 +24,8 @@ npm run build
 - In the shop, tap an item to see it on an echo before you buy it. Color, hat, and glasses can be previewed together.
 - Collect three crypto coins to seal the round. The path you just drew becomes a ghost. The wallet is in dollars.
 - You are safe for a short moment when a new echo wakes up, and for a moment after a shield ends. That opening moment gets shorter as the rounds climb, and the echoes replay your route faster.
-- Cyan shields block a hit for about five seconds. Gold `+` pickups add $5 and 25 points without cancelling a shield. An orange missile flies into the oldest echo and removes it.
-- The shop also sells stored missiles ($160) and unlimited shields ($280). Buy them before a run. There is no stock cap. During play, the missile and shield icons under the score show how many you hold. Tap one, or press M or F, to use a charge. The shield lasts the rest of that run.
+- Cyan shields block a hit for about five seconds. Picking up another shield while one is already up adds a layer and another ring. A stack of three gold bars adds $5 and 25 points without cancelling a shield. An orange missile flies into the oldest echo and removes it.
+- The shop also sells stored missiles ($130) and stored shields ($220). Buy them before a run. There is no stock cap. During play, the missile and shield icons under the score show how many you hold. Tap one, or press M or F, to use a charge. A stored shield has no countdown: it blocks the next hit, then drops. Using another one adds a ring.
 - Shop colors, hats, and glasses dress the echoes that chase you. One of each can be worn at the same time. You stay a fireball.
 
 ## Fixes from the first draft

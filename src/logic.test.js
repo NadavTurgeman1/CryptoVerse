@@ -169,15 +169,23 @@ test('a slide moves by the finger delta and does not jump to the finger', () => 
 
 test('later rounds speed the echoes up, shorten the grace, and pull coins into a cluster', () => {
   assert.deepEqual(roundPressure(1), { playback: 100, grace: 75, spacing: 78, reach: Infinity });
-  assert.deepEqual(roundPressure(2), { playback: 110, grace: 69, spacing: 74, reach: 244 });
-  assert.equal(roundPressure(8).playback, 170);
-  assert.equal(roundPressure(8).grace, 36);
-  assert.equal(roundPressure(8).spacing, 52);
-  assert.equal(roundPressure(8).reach, 150);
-  assert.equal(roundPressure(20).playback, 170);
+  assert.deepEqual(roundPressure(2), { playback: 104, grace: 73, spacing: 77, reach: 312 });
+  assert.equal(roundPressure(8).playback, 128);
+  assert.equal(roundPressure(8).grace, 61);
+  assert.equal(roundPressure(8).spacing, 71);
+  assert.equal(roundPressure(8).reach, 264);
+  const twelve = roundPressure(12);
+  assert.equal(twelve.playback, 144);
+  assert.equal(twelve.grace, 53);
+  assert.equal(twelve.spacing, 67);
+  assert.equal(twelve.reach, 232);
+  assert.equal(roundPressure(16).playback, 160);
+  assert.equal(roundPressure(22).grace, 40);
+  assert.equal(roundPressure(22).reach, 170);
+  assert.equal(roundPressure(24).spacing, 56);
   assert.equal(echoClock(0, 8), 0);
   assert.equal(echoClock(10, 1), 10);
-  assert.equal(echoClock(10, 6), 15);
+  assert.equal(echoClock(10, 6), 12);
   assert.equal(echoClock(-4, 6), 0);
 
   let n = 0;

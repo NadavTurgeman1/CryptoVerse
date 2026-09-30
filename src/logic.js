@@ -41,18 +41,19 @@ export function ghostPoint(echo, frame) {
 }
 
 /**
- * Later rounds tighten the route you just drew.
+ * Later rounds tighten the route you just drew, a little at a time.
  * Playback is a percent of the recorded speed, grace is frames of safety,
  * spacing is how far apart coins stay, and reach pulls them toward the first coin.
+ * The hard floors land around round 20, so round 12 is still a climb.
  */
 export function roundPressure(round) {
   const steps = Math.max(0, Math.floor(Number(round)) - 1);
   const safeSteps = Number.isFinite(steps) ? steps : 0;
   return {
-    playback: Math.min(170, 100 + safeSteps * 10),
-    grace: Math.max(36, 75 - safeSteps * 6),
-    spacing: Math.max(52, 78 - safeSteps * 4),
-    reach: safeSteps === 0 ? Infinity : Math.max(150, 260 - safeSteps * 16),
+    playback: Math.min(160, 100 + safeSteps * 4),
+    grace: Math.max(40, 75 - safeSteps * 2),
+    spacing: Math.max(56, 78 - safeSteps),
+    reach: safeSteps === 0 ? Infinity : Math.max(170, 320 - safeSteps * 8),
   };
 }
 
