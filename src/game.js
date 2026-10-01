@@ -1423,7 +1423,141 @@ function ensureStars() {
       tint: roll > 0.86 ? '186, 206, 255' : roll > 0.74 ? '255, 226, 186' : '255, 255, 255',
     });
   }
-  starfield = { w: view.w, h: view.h, points };
+
+  const area = view.w * view.h;
+  const galaxies = [];
+  const galaxyCount = Math.min(4, Math.max(2, Math.round(area / 170000)));
+  for (let i = 0; i < galaxyCount; i += 1) {
+    const disk = rand() > 0.28;
+    const specks = [];
+    const speckCount = disk ? 5 : 8;
+    for (let s = 0; s < speckCount; s += 1) {
+      const spread = disk ? 1 : 7;
+      specks.push({ x: (rand() - 0.5) * spread * 2, y: (rand() - 0.5) * spread * 2 });
+    }
+    galaxies.push({
+      x: view.w * (0.12 + rand() * 0.76),
+      y: view.h * (0.1 + rand() * 0.8),
+      rx: 16 + rand() * 26,
+      ry: 4 + rand() * 7,
+      rot: rand() * Math.PI,
+      disk,
+      dust: rand() > 0.5 ? '150, 168, 214' : '176, 150, 186',
+      core: rand() > 0.5 ? '214, 224, 255' : '255, 236, 214',
+      specks,
+    });
+  }
+
+  const nebulaColors = ['118, 96, 168', '78, 124, 168', '156, 96, 118', '86, 132, 138'];
+  const nebulae = nebulaColors.slice(0, area > 500000 ? 4 : 3).map((color) => ({
+    x: view.w * (0.15 + rand() * 0.7),
+    y: view.h * (0.12 + rand() * 0.76),
+    r: Math.min(view.w, view.h) * (0.14 + rand() * 0.1),
+    color,
+    phase: rand() * Math.PI * 2,
+    drift: 10 + rand() * 16,
+  }));
+
+  const comets = [];
+  const cometCount = area > 500000 ? 3 : 2;
+  for (let i = 0; i < cometCount; i += 1) {
+    comets.push({
+      y0: view.h * (0.12 + rand() * 0.76),
+      slope: -0.28 + rand() * 0.56,
+      period: 26 + rand() * 24,
+      offset: rand(),
+      tail: 34 + rand() * 38,
+      angle: -0.55 + rand() * 0.7,
+    });
+  }
+
+  starfield = { w: view.w, h: view.h, points, galaxies, nebulae, comets };
+}
+
+function drawNebulae(now) {
+  for (const cloud of starfield.nebulae) {
+    const x = cloud.x + Math.sin(now * 0.045 + cloud.phase) * cloud.drift;
+    const y = cloud.y + Math.cos(now * 0.037 + cloud.phase) * cloud.drift * 0.55;
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, cloud.r);
+    glow.addColorStop(0, `rgba(${cloud.color}, 0.075)`);
+    glow.addColorStop(0.42, `rgba(${cloud.color}, 0.028)`);
+    glow.addColorStop(1, `rgba(${cloud.color}, 0)`);
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, cloud.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    const wx = x + Math.cos(cloud.phase) * cloud.r * 0.38;
+    const wy = y - cloud.r * 0.12;
+    const wispRadius = cloud.r * 0.48;
+    const wisp = ctx.createRadialGradient(wx, wy, 0, wx, wy, wispRadius);
+    wisp.addColorStop(0, `rgba(${cloud.color}, 0.045)`);
+    wisp.addColorStop(1, `rgba(${cloud.color}, 0)`);
+    ctx.fillStyle = wisp;
+    ctx.beginPath();
+    ctx.arc(wx, wy, wispRadius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawGalaxies() {
+  for (const galaxy of starfield.galaxies) {
+    ctx.save();
+    ctx.translate(galaxy.x, galaxy.y);
+    ctx.rotate(galaxy.rot);
+    if (galaxy.disk) {
+      ctx.scale(1, galaxy.ry / galaxy.rx);
+      ctx.beginPath();
+      ctx.arc(0, 0, galaxy.rx, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${galaxy.dust}, 0.11)`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(${galaxy.core}, 0.14)`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, galaxy.rx * 0.62, 0.3, 2.15);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, galaxy.rx * 0.38, 2.5, 4.3);
+      ctx.stroke();
+    }
+    ctx.fillStyle = `rgba(${galaxy.core}, ${galaxy.disk ? 0.28 : 0.22})`;
+    for (const speck of galaxy.specks) {
+      ctx.fillRect(speck.x, speck.y, 1.1, 1.1);
+    }
+    ctx.restore();
+    ctx.fillStyle = `rgba(${galaxy.core}, 0.4)`;
+    ctx.beginPath();
+    ctx.arc(galaxy.x, galaxy.y, galaxy.disk ? 1.5 : 1.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawComets(now) {
+  for (const comet of starfield.comets) {
+    const cycle = (now / comet.period + comet.offset) % 1;
+    if (cycle > 0.2) continue;
+    const travel = cycle / 0.2;
+    const fade = Math.sin(travel * Math.PI);
+    const x = -comet.tail + travel * (view.w + comet.tail * 2);
+    const y = comet.y0 + (x - view.w * 0.5) * comet.slope;
+    const dx = Math.cos(comet.angle) * comet.tail;
+    const dy = Math.sin(comet.angle) * comet.tail;
+    const tail = ctx.createLinearGradient(x, y, x - dx, y - dy);
+    tail.addColorStop(0, `rgba(255, 246, 226, ${0.38 * fade})`);
+    tail.addColorStop(0.45, `rgba(186, 206, 255, ${0.12 * fade})`);
+    tail.addColorStop(1, 'rgba(186, 206, 255, 0)');
+    ctx.strokeStyle = tail;
+    ctx.lineWidth = 1.25;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - dx, y - dy);
+    ctx.stroke();
+    ctx.fillStyle = `rgba(255, 250, 242, ${0.62 * fade})`;
+    ctx.beginPath();
+    ctx.arc(x, y, 1.25, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 function drawGrid() {
@@ -1466,6 +1600,8 @@ function drawAtmosphere() {
   }
 
   ensureStars();
+  drawNebulae(now);
+  drawGalaxies();
   for (const star of starfield.points) {
     const twinkle = 0.62 + Math.sin(now * 1.4 + star.phase) * 0.32;
     ctx.fillStyle = `rgba(${star.tint}, ${twinkle})`;
@@ -1483,6 +1619,7 @@ function drawAtmosphere() {
       ctx.stroke();
     }
   }
+  drawComets(now);
   ctx.restore();
 }
 
