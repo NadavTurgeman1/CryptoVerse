@@ -1451,10 +1451,106 @@ function mulberry32(seed) {
   };
 }
 
+function softBlob(g, x, y, radius, rgb, alpha) {
+  if (!(radius > 0) || !(alpha > 0)) return;
+  const glow = g.createRadialGradient(x, y, 0, x, y, radius);
+  glow.addColorStop(0, `rgba(${rgb}, ${alpha})`);
+  glow.addColorStop(0.45, `rgba(${rgb}, ${alpha * 0.35})`);
+  glow.addColorStop(1, `rgba(${rgb}, 0)`);
+  g.fillStyle = glow;
+  g.beginPath();
+  g.arc(x, y, radius, 0, Math.PI * 2);
+  g.fill();
+}
+
+function spiralGeometry() {
+  const turns = 1.15;
+  const maxTheta = turns * Math.PI * 2;
+  const inner = 0.22;
+  return { maxTheta, inner, growth: Math.log(1 / inner) / maxTheta };
+}
+
+function spiralAt(radius, theta, phase, geom) {
+  const r = radius * geom.inner * Math.exp(geom.growth * theta);
+  const angle = theta + phase;
+  return { x: Math.cos(angle) * r, y: Math.sin(angle) * r, angle };
+}
+
+/** A small smear of star dust wound into a spiral. Faint enough to sit in the background. */
+function paintSpiralGalaxy(g, rand, radius, tilt) {
+  const geom = spiralGeometry();
+  g.save();
+  g.scale(1, tilt);
+  g.globalCompositeOperation = 'source-over';
+
+  for (let arm = 0; arm < 2; arm += 1) {
+    const phase = arm * Math.PI + (rand() - 0.5) * 0.35;
+    const reach = 0.88 + rand() * 0.12;
+    for (let i = 0; i < 32; i += 1) {
+      const t = i / 31;
+      const point = spiralAt(radius * reach, t * geom.maxTheta, phase, geom);
+      const body = Math.sin(Math.PI * t);
+      const width = radius * (0.18 + body * 0.34);
+      softBlob(g, point.x, point.y, width, '186, 204, 232', 0.018 + body * 0.022);
+      const scatter = (rand() - 0.5) * width * 1.8;
+      const sx = point.x + Math.cos(point.angle + Math.PI / 2) * scatter;
+      const sy = point.y + Math.sin(point.angle + Math.PI / 2) * scatter;
+      g.fillStyle = `rgba(214, 224, 244, ${0.16 + rand() * 0.2})`;
+      g.beginPath();
+      g.arc(sx, sy, 0.42, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  g.restore();
+  softBlob(g, 0, 0, radius * 0.2, '214, 206, 190', 0.04);
+}
+
+/** Edge-on disk as a thin dust smear, without a bright core. */
+function paintEdgeGalaxy(g, rand, rx) {
+  const ry = Math.max(2, rx * 0.16);
+  g.globalCompositeOperation = 'source-over';
+  g.save();
+  g.scale(1, ry / rx);
+  const disk = g.createRadialGradient(0, 0, 0, 0, 0, rx);
+  disk.addColorStop(0, 'rgba(198, 210, 232, 0.14)');
+  disk.addColorStop(0.4, 'rgba(170, 188, 216, 0.06)');
+  disk.addColorStop(1, 'rgba(170, 188, 216, 0)');
+  g.fillStyle = disk;
+  g.beginPath();
+  g.arc(0, 0, rx, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
+
+  for (let i = 0; i < 18; i += 1) {
+    const along = (rand() - 0.5) * 2;
+    const x = along * rx * (0.2 + rand() * 0.7);
+    const y = (rand() - 0.5) * ry * 0.8;
+    g.fillStyle = `rgba(220, 228, 244, ${0.1 + rand() * 0.14})`;
+    g.beginPath();
+    g.arc(x, y, 0.35, 0, Math.PI * 2);
+    g.fill();
+  }
+  softBlob(g, 0, 0, ry * 1.4, '210, 204, 190', 0.08);
+}
+
+function rasterizeGalaxy(paint, span, dpr, rot) {
+  const size = Math.max(2, Math.ceil(span * 2 * dpr));
+  const buffer = document.createElement('canvas');
+  buffer.width = size;
+  buffer.height = size;
+  const g = buffer.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, size / 2, size / 2);
+  g.save();
+  g.rotate(rot);
+  paint(g);
+  g.restore();
+  return buffer;
+}
+
 let starfield = null;
 
 function ensureStars() {
-  if (starfield && starfield.w === view.w && starfield.h === view.h) return;
+  if (starfield && starfield.w === view.w && starfield.h === view.h && starfield.dpr === view.dpr) return;
   const rand = mulberry32(11);
   const count = Math.round((view.w * view.h) / 3400);
   const points = [];
@@ -1470,36 +1566,39 @@ function ensureStars() {
   }
 
   const area = view.w * view.h;
-  const galaxies = [];
-  const layouts = [
-    { disk: false },
-    { disk: false },
-    { disk: true },
+  const galaxyRand = mulberry32(29);
+  const unit = Math.min(view.w, view.h);
+  const blueprints = [
+    { kind: 'spiral', tilt: 0.9, at: { x: 0.74, y: 0.28 } },
+    { kind: 'edge', tilt: 1, at: { x: 0.7, y: 0.62 } },
+    { kind: 'spiral', tilt: 0.62, at: { x: 0.26, y: 0.46 } },
   ];
-  if (area > 500000) layouts.push({ disk: true });
-  for (const layout of layouts) {
-    const specks = [];
-    const spread = layout.disk ? 10 : 16 + rand() * 10;
-    const speckCount = layout.disk ? 7 : 14;
-    for (let s = 0; s < speckCount; s += 1) {
-      specks.push({
-        x: (rand() - 0.5) * spread * 2,
-        y: (rand() - 0.5) * spread * 2,
-        r: layout.disk ? 0.7 : 0.6 + rand() * 0.8,
-      });
-    }
-    galaxies.push({
-      x: view.w * (0.16 + rand() * 0.68),
-      y: view.h * (0.14 + rand() * 0.7),
-      rx: 22 + rand() * 20,
-      ry: 7 + rand() * 6,
-      rot: rand() * Math.PI,
-      disk: layout.disk,
-      dust: rand() > 0.5 ? '150, 168, 214' : '176, 150, 186',
-      core: rand() > 0.5 ? '214, 224, 255' : '255, 236, 214',
-      haze: layout.disk ? 0 : spread,
-      specks,
-    });
+  if (area > 500000) blueprints.push({ kind: 'spiral', tilt: 0.78, at: { x: 0.32, y: 0.78 } });
+  blueprints.push(
+    { kind: 'spiral', tilt: 0.88, at: { x: 0.16, y: 0.14 } },
+    { kind: 'edge', at: { x: 0.46, y: 0.16 }, spin: 1.05 },
+    { kind: 'edge', at: { x: 0.9, y: 0.4 }, spin: Math.PI / 2 },
+    { kind: 'spiral', tilt: 0.55, at: { x: 0.18, y: 0.84 } },
+    { kind: 'edge', at: { x: 0.58, y: 0.9 }, spin: -0.25 },
+  );
+  const galaxies = [];
+  for (const blueprint of blueprints) {
+    const edge = blueprint.kind === 'edge';
+    const radius = clamp(unit * (edge ? 0.05 : 0.04) * (0.9 + galaxyRand() * 0.2), 12, edge ? 26 : 20);
+    const tilt = edge ? 1 : clamp(blueprint.tilt + (galaxyRand() - 0.5) * 0.05, 0.5, 0.96);
+    const span = radius * (edge ? 1.28 : 1.35);
+    const rot = blueprint.spin != null
+      ? blueprint.spin + (galaxyRand() - 0.5) * 0.2
+      : edge
+        ? (galaxyRand() - 0.5) * 0.7
+        : galaxyRand() * Math.PI * 2;
+    const x = view.w * clamp(blueprint.at.x + (galaxyRand() - 0.5) * 0.08, 0.1, 0.9);
+    const y = view.h * clamp(blueprint.at.y + (galaxyRand() - 0.5) * 0.06, 0.08, 0.92);
+    const image = rasterizeGalaxy((g) => {
+      if (edge) paintEdgeGalaxy(g, galaxyRand, radius);
+      else paintSpiralGalaxy(g, galaxyRand, radius, tilt);
+    }, span, view.dpr, rot);
+    galaxies.push({ x, y, span, image });
   }
 
   const nebulaColors = ['138, 108, 196', '86, 142, 196', '176, 104, 132', '92, 156, 158'];
@@ -1525,7 +1624,7 @@ function ensureStars() {
     });
   }
 
-  starfield = { w: view.w, h: view.h, points, galaxies, nebulae, comets };
+  starfield = { w: view.w, h: view.h, dpr: view.dpr, points, galaxies, nebulae, comets };
 }
 
 function drawNebulae(now) {
@@ -1556,36 +1655,13 @@ function drawNebulae(now) {
 
 function drawGalaxies() {
   for (const galaxy of starfield.galaxies) {
-    if (!galaxy.disk && galaxy.haze) {
-      const haze = ctx.createRadialGradient(galaxy.x, galaxy.y, 0, galaxy.x, galaxy.y, galaxy.haze * 1.6);
-      haze.addColorStop(0, `rgba(${galaxy.dust}, 0.2)`);
-      haze.addColorStop(1, `rgba(${galaxy.dust}, 0)`);
-      ctx.fillStyle = haze;
-      ctx.beginPath();
-      ctx.arc(galaxy.x, galaxy.y, galaxy.haze * 1.6, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.save();
-    ctx.translate(galaxy.x, galaxy.y);
-    ctx.rotate(galaxy.rot);
-    if (galaxy.disk) {
-      ctx.scale(1, galaxy.ry / galaxy.rx);
-      ctx.beginPath();
-      ctx.arc(0, 0, galaxy.rx, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${galaxy.dust}, 0.2)`;
-      ctx.fill();
-    }
-    for (const speck of galaxy.specks) {
-      ctx.fillStyle = `rgba(${galaxy.core}, ${galaxy.disk ? 0.45 : 0.62})`;
-      ctx.beginPath();
-      ctx.arc(speck.x, speck.y, speck.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-    ctx.fillStyle = `rgba(${galaxy.core}, 0.7)`;
-    ctx.beginPath();
-    ctx.arc(galaxy.x, galaxy.y, galaxy.disk ? 1.6 : 1.25, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.drawImage(
+      galaxy.image,
+      galaxy.x - galaxy.span,
+      galaxy.y - galaxy.span,
+      galaxy.span * 2,
+      galaxy.span * 2,
+    );
   }
 }
 
@@ -3018,7 +3094,7 @@ function drawCryptoCoin(x, y, radius, kind) {
   ctx.arc(0, 0, radius * 2.5, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.globalAlpha = 0.88;
+  ctx.globalAlpha = 0.92;
   ctx.fillStyle = '#4e2c0a';
   ctx.beginPath();
   ctx.arc(0, radius * 0.1, radius, 0, Math.PI * 2);
