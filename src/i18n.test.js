@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { languageOffer, translate } from './i18n.js';
+import { STRINGS, UI_LANGS, languageOffer, translate } from './i18n.js';
 
 test('hebrew falls back to english for a missing key and fills placeholders', () => {
   assert.equal(translate('he', 'play'), 'שחק');
@@ -24,4 +24,29 @@ test('language stays English unless the browser prefers a language we ship', () 
   assert.equal(translate('de', 'back'), 'Zurück');
   assert.equal(translate('ar', 'play'), 'العب');
   assert.equal(translate('ar', 'shop'), 'المتجر');
+});
+
+test('every shop item has its own name in every language', () => {
+  const keys = [
+    'rose', 'cyan', 'violet', 'matrix', 'gold', 'ember', 'lime', 'ice', 'magenta', 'royal',
+    'amber', 'mint', 'pearl', 'crimson', 'sunset', 'void', 'peach', 'ocean', 'toxic', 'prism',
+    'none', 'cap', 'beanie', 'tophat', 'crown', 'santa', 'dogears', 'catears', 'bunny', 'pirate',
+    'astro', 'party', 'cowboy', 'wizard', 'beret', 'halo', 'viking', 'chef', 'flower', 'horns',
+    'propeller', 'sombrero', 'headphones', 'banana', 'bag', 'imperial', 'rounds', 'shades', 'visor',
+    'shadeRed', 'shadeBlue', 'shadeGold', 'shadeGreen', 'shadePink', 'shadeViolet', 'shadeWhite',
+    'shadeAmber', 'patch', 'monocle', 'stereo', 'hearts', 'stars', 'goggles', 'aviator', 'nerd', 'mustache',
+  ];
+  for (const lang of UI_LANGS) {
+    for (const key of keys) {
+      const name = STRINGS[lang][key];
+      assert.equal(typeof name, 'string', `${lang}.${key}`);
+      assert.equal(name.length > 0, true, `${lang}.${key}`);
+      assert.equal(translate(lang, key), name);
+    }
+  }
+  assert.equal(translate('fr', 'dogears'), 'Oreilles de chien');
+  assert.equal(translate('es', 'bag'), 'Bolsa de papel');
+  assert.equal(translate('de', 'viking'), 'Wikinger');
+  assert.equal(translate('ar', 'astro'), 'رائد فضاء');
+  assert.equal(translate('he', 'prism'), 'מתחלף');
 });
