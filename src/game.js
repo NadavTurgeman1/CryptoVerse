@@ -19,7 +19,7 @@ import {
   spendCharge,
   takeOverlaps,
 } from './logic.js';
-import { translate } from './i18n.js';
+import { languageOffer, translate } from './i18n.js';
 
 const COLORS = [
   { id: '#ff2a55', nameKey: 'rose', price: 0, slot: 'color' },
@@ -79,7 +79,7 @@ const STORAGE = {
 };
 
 const STEP = 1000 / 60;
-const SHIELD_FRAMES = 300;
+const SHIELD_FRAMES = 420;
 const SHIELD_END_GRACE = 24;
 const COIN_BONUS = 5;
 const COIN_SCORE = 25;
@@ -161,6 +161,11 @@ const AudioEngine = {
     window.setTimeout(() => this.play(466, 'sine', 0.16, 0.06), 70);
     window.setTimeout(() => this.play(698, 'sine', 0.28, 0.05), 150);
   },
+  record() {
+    this.play(523.25, 'triangle', 0.12, 0.07);
+    window.setTimeout(() => this.play(659.25, 'triangle', 0.14, 0.07), 90);
+    window.setTimeout(() => this.play(880, 'sine', 0.28, 0.06), 180);
+  },
   hit() { this.play(120, 'sawtooth', 0.4); },
   powerup() { this.play(880, 'triangle', 0.3); },
   launch() { this.play(360, 'sawtooth', 0.16); },
@@ -207,6 +212,14 @@ let roundFrame = 0;
 let skipFrameTick = false;
 let bannerText = '';
 let bannerTimer = 0;
+let recordNoted = false;
+let recordFlash = 0;
+let coinFlashes = [];
+
+const sackImage = new Image();
+sackImage.src = '/art/sack.png';
+const bitcoinImage = new Image();
+bitcoinImage.src = '/art/bitcoin.png';
 let shake = 0;
 let isDragging = false;
 const joystick = {
@@ -294,6 +307,25 @@ function applyLanguage() {
   if (!document.getElementById('profile-screen').classList.contains('hidden')) renderProfile();
   if (!document.getElementById('shop-screen').classList.contains('hidden')) renderShop();
   syncSettingsForm();
+}
+
+function savedLanguage() {
+  const saved = safeJson(storageGet(STORAGE.settings), {});
+  return saved.lang === 'en' || saved.lang === 'he' ? saved.lang : null;
+}
+
+function offerLanguage() {
+  const prompt = document.getElementById('lang-prompt');
+  if (!prompt) return;
+  const offer = languageOffer(navigator.languages || [navigator.language], savedLanguage());
+  prompt.classList.toggle('hidden', offer !== 'he');
+}
+
+function chooseLanguage(lang) {
+  settings.lang = lang === 'he' ? 'he' : 'en';
+  saveSettings();
+  applyLanguage();
+  document.getElementById('lang-prompt')?.classList.add('hidden');
 }
 
 function syncSettingsForm() {
@@ -774,8 +806,8 @@ function renderPreview() {
   const preview = document.getElementById('loadout-preview');
   if (!preview) return;
   const g = preview.getContext('2d');
-  const width = 180;
-  const height = 168;
+  const width = 240;
+  const height = 160;
   const dpr = 2;
   if (preview.width !== width * dpr) {
     preview.width = width * dpr;
@@ -789,9 +821,9 @@ function renderPreview() {
     hoverTry,
   );
   paintOn(g, () => {
-    drawSpirit(width / 2, height * 0.62, {
+    drawSpirit(width / 2, height * 0.56, {
       color: look.color,
-      radius: 28,
+      radius: 34,
       phase: performance.now() / 180,
       hollow: true,
       hat: look.hat,
@@ -892,20 +924,40 @@ function burst(x, y, color) {
 }
 
 function sparkle(x, y, color) {
-  for (let i = 0; i < 3; i += 1) {
-    if (particles.length > 80) particles.shift();
-    const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.2;
-    const speed = 0.25 + Math.random() * 0.45;
+  coinFlashes.push({ x, y, life: 18 });
+  for (let i = 0; i < 10; i += 1) {
+    if (particles.length > 90) particles.shift();
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.8 + Math.random() * 1.6;
     particles.push({
       x,
       y,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      life: 8 + Math.floor(Math.random() * 4),
-      color,
-      size: 1.6,
+      vy: Math.sin(angle) * speed - 0.4,
+      life: 14 + Math.floor(Math.random() * 8),
+      color: i % 3 === 0 ? '#fff6d0' : color,
+      size: 2.8,
     });
   }
+}
+
+function addScore(amount) {
+  score += amount;
+  noteRecord();
+}
+
+function noteRecord() {
+  const scoreBreak = bestScore > 0 && score > bestScore;
+  const roundBreak = bestRound > 0 && currentRound > bestRound;
+  if ((!scoreBreak && !roundBreak) || recordNoted) return;
+  recordNoted = true;
+  recordFlash = 50;
+  bannerText = t('recordBanner');
+  bannerTimer = 100;
+  shake = 7;
+  burst(player.x, player.y, '#ffe7a3');
+  burst(player.x, player.y, '#fffdf2');
+  AudioEngine.record();
 }
 
 function startGame() {
@@ -928,6 +980,10 @@ function startGame() {
   shake = 0;
   bannerText = '';
   bannerTimer = 0;
+  recordNoted = false;
+  recordFlash = 0;
+  coinFlashes = [];
+  document.getElementById('game-over-screen')?.classList.remove('record');
   gamesPlayed += 1;
 
   resizeCanvas();
@@ -1012,8 +1068,11 @@ function advanceRound() {
   roundFrame = next.frame;
   skipFrameTick = true;
   grace = roundPressure(currentRound).grace;
-  bannerText = t('roundBanner', { n: currentRound });
-  bannerTimer = 110;
+  if (!recordNoted) {
+    bannerText = t('roundBanner', { n: currentRound });
+    bannerTimer = 110;
+  }
+  noteRecord();
   AudioEngine.round();
   spawnCollectibles();
   announce(bannerText);
@@ -1033,7 +1092,7 @@ function applyPowerup(power) {
   }
 
   coins += COIN_BONUS;
-  score += COIN_SCORE;
+  addScore(COIN_SCORE);
   saveAll();
   AudioEngine.sack();
   showToast(t('bonus', { n: COIN_BONUS }));
@@ -1069,7 +1128,7 @@ function detonateMissile(x, y, hit) {
   if (!hit) return;
   const next = dropOldestEcho(echoes);
   echoes = next.echoes;
-  score += 20;
+  addScore(20);
   AudioEngine.blast();
   showToast(t('echoDestroyed'));
   announce(t('echoDestroyed'));
@@ -1120,7 +1179,7 @@ function collectCoins() {
   if (!hit.taken.length) return;
 
   collectibles = hit.kept;
-  score += 10 * hit.taken.length;
+  addScore(10 * hit.taken.length);
   coins += hit.taken.length;
   for (const coin of hit.taken) sparkle(coin.x, coin.y, '#ffbb00');
   AudioEngine.coin();
@@ -1235,6 +1294,11 @@ function update() {
 
   if (grace > 0) grace -= 1;
   if (bannerTimer > 0) bannerTimer -= 1;
+  if (recordFlash > 0) recordFlash -= 1;
+  for (let i = coinFlashes.length - 1; i >= 0; i -= 1) {
+    coinFlashes[i].life -= 1;
+    if (coinFlashes[i].life <= 0) coinFlashes.splice(i, 1);
+  }
   if (skipFrameTick) skipFrameTick = false;
   else roundFrame += 1;
   syncHUD();
@@ -1253,10 +1317,22 @@ function gameOver() {
   syncHUD();
   syncMenu();
 
-  const celebrate = hadRecord && (scoreRecord || roundRecord) ? t('newRecord') : '';
+  const brokeRecord = hadRecord && (scoreRecord || roundRecord);
+  const celebrate = brokeRecord ? t('newRecord') : '';
   const summary = `${t('lostLine', { round: currentRound, score })}${celebrate}`;
   setText('final-stats', summary);
   setText('final-best', t('bestLine', { score: bestScore, round: bestRound }));
+  const recordBanner = document.getElementById('record-banner');
+  if (recordBanner) {
+    recordBanner.hidden = !brokeRecord;
+    recordBanner.textContent = t('recordBanner');
+  }
+  document.getElementById('game-over-screen')?.classList.toggle('record', brokeRecord);
+  if (brokeRecord) {
+    burst(player.x, player.y, '#ffe7a3');
+    burst(player.x, player.y, '#fffdf2');
+    window.setTimeout(() => AudioEngine.record(), 180);
+  }
   missile = null;
   setMode('GAMEOVER');
   showScreen('game-over-screen');
@@ -1509,35 +1585,44 @@ function drawFireball(x, y, radius, phase, alpha, heading = null) {
   ctx.restore();
 }
 
+function drawFadedStroke(points, width, rgb, peak) {
+  const last = points.length - 1;
+  const chunks = 32;
+  const step = Math.max(1, Math.ceil(last / chunks));
+  ctx.lineWidth = width;
+  for (let start = 0; start < last; start += step) {
+    const end = Math.min(last, start + step);
+    const alpha = peak * (end / last) ** 1.7;
+    if (alpha < 0.015) continue;
+    ctx.strokeStyle = `rgba(${rgb}, ${alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(points[start].x, points[start].y);
+    for (let i = start + 1; i <= end; i += 1) ctx.lineTo(points[i].x, points[i].y);
+    ctx.stroke();
+  }
+}
+
 function drawFireTrail(points) {
   if (points.length < 2) return;
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.strokeStyle = 'rgba(255, 48, 0, 0.28)';
-  ctx.lineWidth = 18;
-  strokePath(points);
-  ctx.stroke();
-  ctx.strokeStyle = 'rgba(255, 122, 16, 0.78)';
-  ctx.lineWidth = 8;
-  strokePath(points);
-  ctx.stroke();
-  ctx.strokeStyle = 'rgba(255, 236, 176, 0.9)';
-  ctx.lineWidth = 2.6;
-  strokePath(points);
-  ctx.stroke();
+  drawFadedStroke(points, 18, '255, 48, 0', 0.28);
+  drawFadedStroke(points, 8, '255, 122, 16', 0.78);
+  drawFadedStroke(points, 2.6, '255, 236, 176', 0.9);
 
-  const start = Math.max(0, points.length - 14);
+  const start = Math.max(0, points.length - 18);
   const wobble = performance.now() / 70;
+  const last = points.length - 1;
   for (let i = start; i < points.length; i += 1) {
-    const t = (i - start) / 14;
-    ctx.globalAlpha = 0.2 + t * 0.65;
-    ctx.fillStyle = t > 0.72 ? '#fff3c8' : '#ff5310';
+    const t = i / last;
+    ctx.globalAlpha = 0.15 + t * t * 0.75;
+    ctx.fillStyle = t > 0.9 ? '#fff3c8' : '#ff5310';
     ctx.beginPath();
     ctx.arc(
       points[i].x,
       points[i].y + Math.sin(wobble + i) * 1.6,
-      2.4 + t * 5.5,
+      1.6 + t * 4.2,
       0,
       Math.PI * 2,
     );
@@ -1876,46 +1961,10 @@ function fillRibbon(start, control, end, half) {
 }
 
 function drawBitcoinMark(radius) {
-  const halfH = radius * 0.64;
-  const halfW = halfH * (539 / 746);
-  const x = (unit) => -halfW + unit * halfW * 2;
-  const y = (unit) => -halfH + unit * halfH * 2;
-  const stub = (u0, u1, v0, v1) => {
-    ctx.fillRect(x(u0), y(v0), x(u1) - x(u0), y(v1) - y(v0));
-  };
-  ctx.fillStyle = '#0d0d0d';
-  stub(0.258, 0.382, 0, 0.16);
-  stub(0.488, 0.612, 0, 0.16);
-  stub(0.258, 0.382, 0.84, 1);
-  stub(0.488, 0.612, 0.84, 1);
-
-  ctx.beginPath();
-  ctx.moveTo(x(0), y(0.16));
-  ctx.lineTo(x(0.5), y(0.16));
-  ctx.bezierCurveTo(x(0.98), y(0.16), x(0.96), y(0.4), x(0.55), y(0.45));
-  ctx.lineTo(x(0.17), y(0.45));
-  ctx.lineTo(x(0.17), y(0.24));
-  ctx.lineTo(x(0), y(0.24));
-  ctx.closePath();
-  ctx.moveTo(x(0.4), y(0.28));
-  ctx.bezierCurveTo(x(0.78), y(0.26), x(0.8), y(0.4), x(0.4), y(0.42));
-  ctx.closePath();
-  ctx.fill('evenodd');
-
-  ctx.beginPath();
-  ctx.moveTo(x(0.17), y(0.48));
-  ctx.lineTo(x(0.58), y(0.48));
-  ctx.bezierCurveTo(x(1.04), y(0.5), x(1.02), y(0.74), x(0.5), y(0.78));
-  ctx.lineTo(x(0.17), y(0.78));
-  ctx.lineTo(x(0.17), y(0.84));
-  ctx.lineTo(x(0), y(0.84));
-  ctx.lineTo(x(0), y(0.74));
-  ctx.lineTo(x(0.17), y(0.74));
-  ctx.closePath();
-  ctx.moveTo(x(0.4), y(0.56));
-  ctx.bezierCurveTo(x(0.9), y(0.54), x(0.92), y(0.7), x(0.4), y(0.72));
-  ctx.closePath();
-  ctx.fill('evenodd');
+  if (!bitcoinImage.complete || !bitcoinImage.naturalWidth) return;
+  const height = radius * 1.2;
+  const width = height * (bitcoinImage.naturalWidth / bitcoinImage.naturalHeight);
+  ctx.drawImage(bitcoinImage, -width / 2, -height / 2, width, height);
 }
 
 function traceFacet(points) {
@@ -2311,85 +2360,50 @@ function drawMissile() {
 
 function drawBonusIcon(x, y) {
   const bob = Math.sin(performance.now() / 260) * 2.2;
-  const pulse = 0.5 + Math.sin(performance.now() / 180) * 0.14;
+  const pulse = 0.42 + Math.sin(performance.now() / 180) * 0.12;
   ctx.save();
   ctx.translate(x, y + bob);
-
-  const glow = ctx.createRadialGradient(0, 8, 4, 0, 8, 58);
-  glow.addColorStop(0, `rgba(255, 214, 90, ${pulse})`);
-  glow.addColorStop(0.38, 'rgba(255, 170, 36, 0.3)');
-  glow.addColorStop(1, 'rgba(255, 170, 36, 0)');
+  const glow = ctx.createRadialGradient(0, 4, 6, 0, 4, 54);
+  glow.addColorStop(0, `rgba(255, 210, 80, ${pulse})`);
+  glow.addColorStop(0.45, 'rgba(255, 170, 40, 0.22)');
+  glow.addColorStop(1, 'rgba(255, 170, 40, 0)');
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(0, 8, 58, 0, Math.PI * 2);
+  ctx.arc(0, 4, 54, 0, Math.PI * 2);
   ctx.fill();
+  if (sackImage.complete && sackImage.naturalWidth) {
+    const size = 78;
+    ctx.drawImage(sackImage, -size / 2, -size / 2, size, size);
+  }
+  ctx.restore();
+}
 
-  ctx.fillStyle = '#e0ae32';
-  ctx.strokeStyle = '#6a3e08';
-  ctx.lineWidth = 1.2;
+function drawCoinFlashes() {
+  for (const flash of coinFlashes) {
+    const t = 1 - flash.life / 18;
+    ctx.save();
+    ctx.strokeStyle = `rgba(255, 214, 90, ${0.85 * (1 - t)})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(flash.x, flash.y, 6 + t * 26, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawRecordFlash() {
+  if (recordFlash <= 0) return;
+  const t = recordFlash / 50;
+  ctx.save();
+  ctx.strokeStyle = `rgba(255, 220, 120, ${t})`;
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(-7, -2);
-  ctx.quadraticCurveTo(-16, -24, -1, -8);
-  ctx.quadraticCurveTo(-4, -4, -7, -2);
-  ctx.closePath();
-  ctx.fill();
+  ctx.arc(player.x, player.y, 18 + (1 - t) * 78, 0, Math.PI * 2);
   ctx.stroke();
+  ctx.fillStyle = `rgba(255, 236, 170, ${t * 0.18})`;
   ctx.beginPath();
-  ctx.moveTo(7, -2);
-  ctx.quadraticCurveTo(16, -24, 1, -8);
-  ctx.quadraticCurveTo(4, -4, 7, -2);
-  ctx.closePath();
+  ctx.arc(player.x, player.y, 18 + (1 - t) * 40, 0, Math.PI * 2);
   ctx.fill();
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(-7, -2);
-  ctx.bezierCurveTo(-30, 4, -24, 32, 0, 32);
-  ctx.bezierCurveTo(24, 32, 30, 4, 7, -2);
-  ctx.quadraticCurveTo(0, 4, -7, -2);
-  ctx.closePath();
-  const body = ctx.createLinearGradient(-18, -4, 16, 32);
-  body.addColorStop(0, '#fff6c4');
-  body.addColorStop(0.42, '#f0c14b');
-  body.addColorStop(1, '#8a520c');
-  ctx.fillStyle = body;
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = '#6e4510';
-  ctx.fillRect(-9, -4, 18, 3.4);
-  ctx.fillStyle = '#ffe29a';
-  ctx.beginPath();
-  ctx.arc(0, -2.2, 2.3, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = 'rgba(90, 48, 8, 0.35)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(-12, 12);
-  ctx.quadraticCurveTo(0, 18, 13, 10);
-  ctx.stroke();
-
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.36)';
-  ctx.beginPath();
-  ctx.ellipse(-8, 12, 3.5, 7.5, -0.4, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.arc(5, 14, 7, 0, Math.PI * 2);
-  const coin = ctx.createRadialGradient(3, 12, 1, 5, 14, 7);
-  coin.addColorStop(0, '#fff1b8');
-  coin.addColorStop(1, '#d79a16');
-  ctx.fillStyle = coin;
-  ctx.fill();
-  ctx.strokeStyle = '#6a3e08';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.fillStyle = '#5c3406';
-  ctx.font = '800 9px system-ui, "DejaVu Sans", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('$', 5, 14.6);
   ctx.restore();
 }
 
@@ -2568,9 +2582,11 @@ function draw() {
     drawSceneLights();
     drawEchoes();
     drawPickups();
+    drawCoinFlashes();
     drawParticles();
     drawMissile();
     drawPlayer();
+    drawRecordFlash();
     drawDragReticle();
     drawJoystick();
     drawBanner();
@@ -2753,10 +2769,10 @@ function bindUI() {
     saveSettings();
   });
   document.getElementById('set-language').addEventListener('change', (event) => {
-    settings.lang = event.target.value === 'he' ? 'he' : 'en';
-    saveSettings();
-    applyLanguage();
+    chooseLanguage(event.target.value);
   });
+  document.getElementById('lang-yes').addEventListener('click', () => chooseLanguage('he'));
+  document.getElementById('lang-no').addEventListener('click', () => chooseLanguage('en'));
   paintPowerIcon(document.getElementById('missile-icon'), 'missile');
   paintPowerIcon(document.getElementById('shield-icon'), 'shield');
 }
@@ -2772,6 +2788,7 @@ syncMenu();
 bindInput();
 bindUI();
 applyLanguage();
+offerLanguage();
 requestAnimationFrame(frame);
 
 if (import.meta.env.DEV) {

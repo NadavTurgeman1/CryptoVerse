@@ -61,6 +61,7 @@ export const STRINGS = {
     roundBanner: 'Round {n}',
     lostLine: 'Round {round} · {score} pts',
     newRecord: ' · New record!',
+    recordBanner: 'New record!',
     lostAnnounce: 'You lost. {summary}',
     rose: 'Rose',
     cyan: 'Cyan',
@@ -140,6 +141,7 @@ export const STRINGS = {
     roundBanner: 'סיבוב {n}',
     lostLine: 'סיבוב {round} · {score} נק׳',
     newRecord: ' · שיא חדש!',
+    recordBanner: 'שיא חדש!',
     lostAnnounce: 'הפסדת. {summary}',
     rose: 'ורוד',
     cyan: 'ציאן',
@@ -160,6 +162,22 @@ export const STRINGS = {
     powerShieldDetail: 'בלי טיימר. חוסם את הפגיעה הבאה ואז נופל. מגן נוסף מוסיף טבעת.',
   },
 };
+
+/**
+ * English stays the default. A saved choice wins. Otherwise offer the first
+ * supported language that is not English, and stop if English is preferred first.
+ */
+export function languageOffer(languages, savedLang) {
+  if (savedLang === 'en' || savedLang === 'he') return null;
+  const list = Array.isArray(languages) ? languages : [];
+  for (const code of list) {
+    const base = String(code || '').toLowerCase().split('-')[0];
+    if (!base) continue;
+    if (base === 'en') return null;
+    if (base === 'he') return 'he';
+  }
+  return null;
+}
 
 export function translate(lang, key, vars) {
   const pack = STRINGS[lang] || STRINGS.en;
