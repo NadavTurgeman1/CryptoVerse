@@ -26,7 +26,7 @@ npm run build
 - You are safe for a short moment when a new echo wakes up, and for a moment after a shield ends. That opening moment gets shorter as the rounds climb, and the echoes replay your route faster.
 - Cyan shields block a hit for about seven seconds. Picking up another shield while one is already up adds a layer and another ring. A glowing gold sack adds $5 and 25 points without cancelling a shield, and it sounds different from a coin. An orange missile flies into the oldest echo and removes it. Collecting a coin makes a very small spark.
 - The shop also sells stored missiles ($130) and stored shields ($220). Buy them before a run. There is no stock cap. During play, the missile and shield sit at the top left, the score is in the top center, and the round sits beside the dollars at the top right. Tap a power, or press M or F. A stored shield has no countdown: it blocks the next hit, then drops. Using another one adds a ring.
-- Profile stats live on the home screen, behind the person icon at the top left. The shop's back button is at the top left.
+- The gear at the top left of the home screen opens settings. The dollar count stays at the top right on every screen. The shop's back button is at the top left.
 - Shop colors, hats, and glasses dress the echoes that chase you. One of each can be worn at the same time. You stay a fireball.
 
 ## Fixes from the first draft

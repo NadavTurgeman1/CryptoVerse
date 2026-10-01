@@ -173,6 +173,11 @@ const AudioEngine = {
   launch() { this.play(360, 'sawtooth', 0.16); },
   blast() { this.play(96, 'square', 0.22); },
   deny() { this.play(180, 'square', 0.08); },
+  shieldBreak() {
+    this.play(880, 'triangle', 0.07, 0.07);
+    window.setTimeout(() => this.play(520, 'sine', 0.1, 0.06), 45);
+    window.setTimeout(() => this.play(240, 'triangle', 0.18, 0.05), 100);
+  },
   round() {
     this.play(523.25, 'triangle', 0.12);
     window.setTimeout(() => this.play(659.25, 'triangle', 0.16), 90);
@@ -310,7 +315,6 @@ function applyLanguage() {
   hudCache.clear();
   syncHUD();
   syncMenu();
-  if (!document.getElementById('profile-screen').classList.contains('hidden')) renderProfile();
   if (!document.getElementById('shop-screen').classList.contains('hidden')) renderShop();
   syncSettingsForm();
 }
@@ -489,29 +493,6 @@ function syncMenu() {
     'menu-best',
     bestScore > 0 ? t('bestLine', { score: bestScore, round: bestRound }) : t('noRecord'),
   );
-}
-
-function renderProfile() {
-  const root = document.getElementById('profile-stats');
-  root.replaceChildren();
-  const rows = [
-    [t('dollars'), `$${coins}`],
-    [t('bestScore'), bestScore],
-    [t('bestRound'), bestRound],
-    [t('runs'), gamesPlayed],
-    [t('missiles'), missileStock],
-    [t('shields'), shieldStock],
-  ];
-  for (const [label, value] of rows) {
-    const row = document.createElement('div');
-    row.className = 'stat-row';
-    const name = document.createElement('span');
-    name.textContent = label;
-    const number = document.createElement('strong');
-    number.textContent = String(value);
-    row.append(name, number);
-    root.append(row);
-  }
 }
 
 function paintOn(target, fn) {
@@ -1027,12 +1008,6 @@ function closeShop() {
   syncMenu();
 }
 
-function openProfile() {
-  setMode('MENU');
-  showScreen('profile-screen');
-  renderProfile();
-}
-
 function openSettings() {
   setMode('MENU');
   syncSettingsForm();
@@ -1271,7 +1246,7 @@ function absorbShieldHit() {
   shieldLayers.pop();
   grace = Math.max(grace, SHIELD_END_GRACE);
   burst(player.x, player.y, '#7af6ff');
-  AudioEngine.play(240, 'triangle', 0.12);
+  AudioEngine.shieldBreak();
 }
 
 function update() {
@@ -1690,12 +1665,12 @@ function drawFireTrail(points) {
   if (ribbon.length < 2) return;
   ctx.save();
   const layers = [
-    [7, 28, '255, 48, 0', 0.22],
-    [2.8, 12, '255, 122, 16', 0.74],
-    [1, 4.2, '255, 244, 210', 0.9],
+    [7, 58, '255, 48, 0', 0.24],
+    [2.8, 26, '255, 122, 16', 0.78],
+    [1, 9, '255, 244, 210', 0.92],
   ];
   for (const [thin, thick, rgb, alpha] of layers) {
-    drawTaper(ribbon, (t) => thin + (thick - thin) * t, rgb, alpha);
+    drawTaper(ribbon, (t) => thin + (thick - thin) * t * t * t, rgb, alpha);
   }
   ctx.restore();
 }
@@ -2815,8 +2790,6 @@ function bindUI() {
   document.getElementById('retry-btn').addEventListener('click', startGame);
   document.getElementById('shop-btn').addEventListener('click', openShop);
   document.getElementById('close-shop').addEventListener('click', closeShop);
-  document.getElementById('open-profile').addEventListener('click', openProfile);
-  document.getElementById('close-profile').addEventListener('click', closeOverlay);
   document.getElementById('open-settings').addEventListener('click', openSettings);
   document.getElementById('close-settings').addEventListener('click', closeOverlay);
   document.getElementById('menu-btn').addEventListener('click', returnToMenu);

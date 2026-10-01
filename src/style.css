@@ -126,7 +126,6 @@ body {
 }
 
 #shop-screen,
-#profile-screen,
 #settings-screen {
   justify-content: flex-start;
   align-items: center;
@@ -343,6 +342,11 @@ h1 {
   min-height: 1.2em;
 }
 
+#menu-best {
+  font-size: 1.4rem;
+  margin-bottom: 22px;
+}
+
 .btn {
   background: linear-gradient(135deg, #ffe7a3, var(--gold) 45%, var(--gold-deep));
   color: #1a1204;
@@ -396,17 +400,12 @@ h1 {
   gap: 8px;
   z-index: 12;
   pointer-events: none;
-  opacity: 0;
+  opacity: 1;
   font-variant-numeric: tabular-nums;
 }
 
-#game-container[data-state="PLAYING"] #hud,
-#game-container[data-state="GAMEOVER"] #hud {
-  opacity: 1;
-}
-
-#game-container[data-state="GAMEOVER"] .hud-center,
-#game-container[data-state="GAMEOVER"] #round-hud {
+#game-container:not([data-state="PLAYING"]) .hud-center,
+#game-container:not([data-state="PLAYING"]) #round-hud {
   display: none;
 }
 
