@@ -19,7 +19,7 @@ import {
   spendCharge,
   takeOverlaps,
 } from './logic.js';
-import { languageOffer, translate } from './i18n.js';
+import { UI_LANGS, languageOffer, translate } from './i18n.js';
 
 const COLORS = [
   { id: '#ff2a55', nameKey: 'rose', price: 0, slot: 'color' },
@@ -80,6 +80,8 @@ const STORAGE = {
 
 const STEP = 1000 / 60;
 const SHIELD_FRAMES = 420;
+const TRAIL_HOLD = 36;
+const TRAIL_FADE = 28;
 const SHIELD_END_GRACE = 24;
 const COIN_BONUS = 5;
 const COIN_SCORE = 25;
@@ -267,6 +269,10 @@ function loadSlot(listKey, activeKey, catalog) {
   };
 }
 
+function isUiLang(lang) {
+  return UI_LANGS.includes(lang);
+}
+
 function t(key, vars) {
   return translate(settings.lang, key, vars);
 }
@@ -281,7 +287,7 @@ function loadSettings() {
     music: saved.music !== false,
     volume: typeof saved.volume === 'number' ? clamp(saved.volume, 0, 1) : 0.7,
     effects: saved.effects !== false,
-    lang: saved.lang === 'he' ? 'he' : 'en',
+    lang: isUiLang(saved.lang) ? saved.lang : 'en',
   };
   AudioEngine.apply(settings);
 }
@@ -311,18 +317,23 @@ function applyLanguage() {
 
 function savedLanguage() {
   const saved = safeJson(storageGet(STORAGE.settings), {});
-  return saved.lang === 'en' || saved.lang === 'he' ? saved.lang : null;
+  return isUiLang(saved.lang) ? saved.lang : null;
 }
+
+let offeredLang = null;
 
 function offerLanguage() {
   const prompt = document.getElementById('lang-prompt');
   if (!prompt) return;
-  const offer = languageOffer(navigator.languages || [navigator.language], savedLanguage());
-  prompt.classList.toggle('hidden', offer !== 'he');
+  offeredLang = languageOffer(navigator.languages || [navigator.language], savedLanguage());
+  prompt.classList.toggle('hidden', !offeredLang);
+  if (!offeredLang) return;
+  document.getElementById('lang-prompt-text').textContent = translate(offeredLang, 'langPrompt');
+  document.getElementById('lang-yes').textContent = translate(offeredLang, 'langYes');
 }
 
 function chooseLanguage(lang) {
-  settings.lang = lang === 'he' ? 'he' : 'en';
+  settings.lang = isUiLang(lang) ? lang : 'en';
   saveSettings();
   applyLanguage();
   document.getElementById('lang-prompt')?.classList.add('hidden');
@@ -1277,7 +1288,7 @@ function update() {
   if (gameState !== 'PLAYING') return;
 
   movePlayer();
-  currentPath.push({ x: player.x, y: player.y });
+  currentPath.push({ x: player.x, y: player.y, t: roundFrame });
   collectCoins();
   collectPowerups();
   stepMissile();
@@ -1585,14 +1596,24 @@ function drawFireball(x, y, radius, phase, alpha, heading = null) {
   ctx.restore();
 }
 
-function drawFadedStroke(points, width, rgb, peak) {
-  const last = points.length - 1;
-  const chunks = 32;
-  const step = Math.max(1, Math.ceil(last / chunks));
+function trailStrength(point) {
+  const age = roundFrame - (point.t ?? roundFrame);
+  if (age <= TRAIL_HOLD) return 1;
+  const fade = (age - TRAIL_HOLD) / TRAIL_FADE;
+  if (fade >= 1) return 0;
+  return 1 - fade;
+}
+
+function drawAgedStroke(points, width, rgb, peak) {
+  let first = 0;
+  while (first < points.length - 1 && trailStrength(points[first]) <= 0) first += 1;
+  if (points.length - first < 2) return;
   ctx.lineWidth = width;
-  for (let start = 0; start < last; start += step) {
+  const last = points.length - 1;
+  const step = Math.max(1, Math.ceil((last - first) / 24));
+  for (let start = first; start < last; start += step) {
     const end = Math.min(last, start + step);
-    const alpha = peak * (end / last) ** 1.7;
+    const alpha = peak * trailStrength(points[end]);
     if (alpha < 0.015) continue;
     ctx.strokeStyle = `rgba(${rgb}, ${alpha})`;
     ctx.beginPath();
@@ -1607,22 +1628,21 @@ function drawFireTrail(points) {
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  drawFadedStroke(points, 18, '255, 48, 0', 0.28);
-  drawFadedStroke(points, 8, '255, 122, 16', 0.78);
-  drawFadedStroke(points, 2.6, '255, 236, 176', 0.9);
+  drawAgedStroke(points, 18, '255, 48, 0', 0.28);
+  drawAgedStroke(points, 8, '255, 122, 16', 0.78);
+  drawAgedStroke(points, 2.6, '255, 236, 176', 0.9);
 
-  const start = Math.max(0, points.length - 18);
   const wobble = performance.now() / 70;
-  const last = points.length - 1;
-  for (let i = start; i < points.length; i += 1) {
-    const t = i / last;
-    ctx.globalAlpha = 0.15 + t * t * 0.75;
-    ctx.fillStyle = t > 0.9 ? '#fff3c8' : '#ff5310';
+  for (let i = 0; i < points.length; i += 1) {
+    const strength = trailStrength(points[i]);
+    if (strength <= 0) continue;
+    ctx.globalAlpha = strength * 0.9;
+    ctx.fillStyle = strength > 0.85 ? '#fff3c8' : '#ff5310';
     ctx.beginPath();
     ctx.arc(
       points[i].x,
       points[i].y + Math.sin(wobble + i) * 1.6,
-      1.6 + t * 4.2,
+      1.6 + strength * 4.2,
       0,
       Math.PI * 2,
     );
@@ -2372,7 +2392,8 @@ function drawBonusIcon(x, y) {
   ctx.arc(0, 4, 54, 0, Math.PI * 2);
   ctx.fill();
   if (sackImage.complete && sackImage.naturalWidth) {
-    const size = 78;
+    const size = 84;
+    ctx.rotate(-0.08);
     ctx.drawImage(sackImage, -size / 2, -size / 2, size, size);
   }
   ctx.restore();
@@ -2771,7 +2792,7 @@ function bindUI() {
   document.getElementById('set-language').addEventListener('change', (event) => {
     chooseLanguage(event.target.value);
   });
-  document.getElementById('lang-yes').addEventListener('click', () => chooseLanguage('he'));
+  document.getElementById('lang-yes').addEventListener('click', () => chooseLanguage(offeredLang || 'en'));
   document.getElementById('lang-no').addEventListener('click', () => chooseLanguage('en'));
   paintPowerIcon(document.getElementById('missile-icon'), 'missile');
   paintPowerIcon(document.getElementById('shield-icon'), 'shield');
