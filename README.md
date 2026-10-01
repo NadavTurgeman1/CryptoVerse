@@ -2,7 +2,7 @@
 
 A one-screen arcade game. You slide a fireball through a dark starfield, grab three crypto coins to finish a round, and then your route comes back as an echo. Later rounds play every previous route at the same time, a little faster each round, with the coins pulled closer together and a shorter moment of safety when the next echo wakes. Dollars stay in the shop between runs and dress the echoes.
 
-The interface is in English.
+The interface is in English by default. A gear on the home screen opens music, volume, effect, and language settings. Hebrew is included.
 
 ## Run locally
 
@@ -24,8 +24,9 @@ npm run build
 - In the shop, tap an item to see it on an echo before you buy it. Color, hat, and glasses can be previewed together.
 - Collect three crypto coins to seal the round. The path you just drew becomes a ghost. The wallet is in dollars.
 - You are safe for a short moment when a new echo wakes up, and for a moment after a shield ends. That opening moment gets shorter as the rounds climb, and the echoes replay your route faster.
-- Cyan shields block a hit for about five seconds. Picking up another shield while one is already up adds a layer and another ring. A stack of three gold bars adds $5 and 25 points without cancelling a shield. An orange missile flies into the oldest echo and removes it.
-- The shop also sells stored missiles ($130) and stored shields ($220). Buy them before a run. There is no stock cap. During play, the missile and shield icons under the score show how many you hold. Tap one, or press M or F, to use a charge. A stored shield has no countdown: it blocks the next hit, then drops. Using another one adds a ring.
+- Cyan shields block a hit for about five seconds. Picking up another shield while one is already up adds a layer and another ring. A glowing gold sack adds $5 and 25 points without cancelling a shield, and it sounds different from a coin. An orange missile flies into the oldest echo and removes it. Collecting a coin makes a very small spark.
+- The shop also sells stored missiles ($130) and stored shields ($220). Buy them before a run. There is no stock cap. During play, the missile and shield sit at the top left, the score is in the top center, and the round sits beside the dollars at the top right. Tap a power, or press M or F. A stored shield has no countdown: it blocks the next hit, then drops. Using another one adds a ring.
+- Profile stats live on the home screen, behind the person icon at the top left. The shop's back button is at the top left.
 - Shop colors, hats, and glasses dress the echoes that chase you. One of each can be worn at the same time. You stay a fireball.
 
 ## Fixes from the first draft
