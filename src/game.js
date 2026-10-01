@@ -1806,6 +1806,7 @@ function drawHat(kind, radius, accent) {
   const r = radius;
   ctx.save();
   if (kind === 'cap' || kind === 'propeller') {
+    ctx.translate(0, -r * 0.34);
     ctx.fillStyle = '#162033';
     ctx.beginPath();
     ctx.ellipse(0, -r * 0.95, r * 0.72, r * 0.48, 0, Math.PI, 0, true);
@@ -1833,6 +1834,7 @@ function drawHat(kind, radius, accent) {
       ctx.fill();
     }
   } else if (kind === 'beanie') {
+    ctx.translate(0, -r * 0.28);
     ctx.fillStyle = '#6d28d9';
     ctx.beginPath();
     ctx.moveTo(-r * 0.78, -r * 0.7);
@@ -1858,6 +1860,7 @@ function drawHat(kind, radius, accent) {
     ctx.stroke();
     fillDot(0, -r * 1.64, r * 0.16, '#f9a8d4');
   } else if (kind === 'tophat') {
+    ctx.translate(0, -r * 0.22);
     ctx.fillStyle = '#12141c';
     ctx.fillRect(-r * 0.4, -r * 1.7, r * 0.8, r * 0.85);
     ctx.beginPath();
@@ -1866,14 +1869,17 @@ function drawHat(kind, radius, accent) {
     ctx.fillStyle = '#ff2a55';
     ctx.fillRect(-r * 0.4, -r * 1.05, r * 0.8, r * 0.1);
   } else if (kind === 'crown') {
+    ctx.translate(0, -r * 0.42);
     drawCrownShape(r, false);
   } else if (kind === 'imperial') {
+    ctx.translate(0, -r * 0.42);
     ctx.fillStyle = '#7f1d1d';
     ctx.beginPath();
     ctx.ellipse(0, -r * 1.05, r * 0.55, r * 0.62, 0, Math.PI, 0, true);
     ctx.fill();
     drawCrownShape(r, true);
   } else if (kind === 'santa') {
+    ctx.translate(0, -r * 0.38);
     ctx.fillStyle = '#d0122d';
     ctx.beginPath();
     ctx.moveTo(-r * 0.72, -r * 0.55);
@@ -1886,35 +1892,29 @@ function drawHat(kind, radius, accent) {
     fillDot(r * 0.46, -r * 1.52, r * 0.16, '#fff');
   } else if (kind === 'dogears') {
     for (const side of [-1, 1]) {
-      ctx.fillStyle = '#8a5a32';
+      ctx.fillStyle = '#8b5a2b';
       ctx.beginPath();
-      ctx.moveTo(side * r * 0.28, -r * 1.0);
-      ctx.quadraticCurveTo(side * r * 0.1, -r * 1.48, side * r * 0.42, -r * 1.74);
-      ctx.quadraticCurveTo(side * r * 0.78, -r * 1.82, side * r * 0.8, -r * 1.38);
-      ctx.quadraticCurveTo(side * r * 0.62, -r * 1.12, side * r * 0.48, -r * 0.96);
+      ctx.moveTo(side * r * 0.28, -r * 1.08);
+      ctx.quadraticCurveTo(side * r * 0.12, -r * 1.52, side * r * 0.4, -r * 1.74);
+      ctx.quadraticCurveTo(side * r * 0.78, -r * 1.84, side * r * 0.9, -r * 1.46);
+      ctx.quadraticCurveTo(side * r * 1.12, -r * 0.92, side * r * 0.8, -r * 0.66);
+      ctx.quadraticCurveTo(side * r * 0.52, -r * 0.58, side * r * 0.46, -r * 0.98);
+      ctx.quadraticCurveTo(side * r * 0.52, -r * 1.12, side * r * 0.4, -r * 1.02);
       ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = '#e48aa8';
+      ctx.fillStyle = '#f0a0b8';
       ctx.beginPath();
-      ctx.moveTo(side * r * 0.36, -r * 1.1);
-      ctx.quadraticCurveTo(side * r * 0.26, -r * 1.42, side * r * 0.46, -r * 1.58);
-      ctx.quadraticCurveTo(side * r * 0.66, -r * 1.62, side * r * 0.66, -r * 1.32);
-      ctx.quadraticCurveTo(side * r * 0.55, -r * 1.16, side * r * 0.44, -r * 1.06);
+      ctx.moveTo(side * r * 0.34, -r * 1.18);
+      ctx.quadraticCurveTo(side * r * 0.26, -r * 1.48, side * r * 0.44, -r * 1.6);
+      ctx.quadraticCurveTo(side * r * 0.66, -r * 1.66, side * r * 0.72, -r * 1.4);
+      ctx.lineTo(side * r * 0.48, -r * 1.2);
       ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = '#8a5a32';
-      ctx.beginPath();
-      ctx.moveTo(side * r * 0.46, -r * 1.5);
-      ctx.quadraticCurveTo(side * r * 0.95, -r * 1.58, side * r * 1.05, -r * 1.15);
-      ctx.quadraticCurveTo(side * r * 1.14, -r * 0.68, side * r * 0.72, -r * 0.56);
-      ctx.quadraticCurveTo(side * r * 0.46, -r * 0.82, side * r * 0.4, -r * 1.28);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(62, 36, 18, 0.4)';
+      ctx.strokeStyle = 'rgba(70, 40, 18, 0.4)';
       ctx.lineWidth = Math.max(1, r * 0.03);
       ctx.beginPath();
-      ctx.moveTo(side * r * 0.42, -r * 1.22);
-      ctx.quadraticCurveTo(side * r * 0.68, -r * 1.5, side * r * 0.88, -r * 1.32);
+      ctx.moveTo(side * r * 0.46, -r * 1.22);
+      ctx.quadraticCurveTo(side * r * 0.68, -r * 1.42, side * r * 0.84, -r * 1.38);
       ctx.stroke();
     }
   } else if (kind === 'catears') {
@@ -1946,6 +1946,7 @@ function drawHat(kind, radius, accent) {
       ctx.fill();
     }
   } else if (kind === 'pirate') {
+    ctx.translate(0, -r * 0.22);
     ctx.fillStyle = '#141820';
     ctx.beginPath();
     ctx.moveTo(0, -r * 1.62);
@@ -2005,6 +2006,7 @@ function drawHat(kind, radius, accent) {
     ctx.fill();
     ctx.stroke();
   } else if (kind === 'party') {
+    ctx.translate(0, -r * 0.4);
     ctx.fillStyle = '#7c3aed';
     ctx.beginPath();
     ctx.moveTo(-r * 0.55, -r * 0.5);
@@ -2016,6 +2018,7 @@ function drawHat(kind, radius, accent) {
     fillDot(r * 0.12, -r * 1.15, r * 0.05, '#fb7185');
     fillDot(0, -r * 1.65, r * 0.1, '#fde68a');
   } else if (kind === 'cowboy') {
+    ctx.translate(0, -r * 0.36);
     ctx.fillStyle = '#8a5a2b';
     ctx.beginPath();
     ctx.ellipse(0, -r * 0.72, r * 1.05, r * 0.22, 0, 0, Math.PI * 2);
@@ -2024,6 +2027,7 @@ function drawHat(kind, radius, accent) {
     ctx.fillStyle = '#5c3b16';
     ctx.fillRect(-r * 0.32, -r * 0.95, r * 0.64, r * 0.1);
   } else if (kind === 'wizard') {
+    ctx.translate(0, -r * 0.4);
     ctx.fillStyle = '#312e81';
     ctx.beginPath();
     ctx.moveTo(-r * 0.7, -r * 0.55);
@@ -2038,6 +2042,7 @@ function drawHat(kind, radius, accent) {
     drawStar(-r * 0.08, -r * 1.05, r * 0.1, r * 0.04, 5);
     ctx.fill();
   } else if (kind === 'beret') {
+    ctx.translate(0, -r * 0.24);
     ctx.fillStyle = '#9f1239';
     ctx.beginPath();
     ctx.ellipse(r * 0.08, -r * 0.95, r * 0.78, r * 0.32, -0.3, 0, Math.PI * 2);
@@ -2050,6 +2055,7 @@ function drawHat(kind, radius, accent) {
     ctx.ellipse(0, -r * 1.45, r * 0.55, r * 0.16, 0, 0, Math.PI * 2);
     ctx.stroke();
   } else if (kind === 'viking') {
+    ctx.translate(0, -r * 0.16);
     for (const side of [-1, 1]) {
       const horn = ctx.createLinearGradient(side * r * 0.4, -r * 0.7, side * r * 1.35, -r * 1.7);
       horn.addColorStop(0, '#b7aa96');
@@ -2087,16 +2093,19 @@ function drawHat(kind, radius, accent) {
     for (const y of [-1.32, -1.08, -0.84]) fillDot(0, r * y, r * 0.035, '#e5e7eb');
     for (const x of [-0.52, -0.26, 0.26, 0.52]) fillDot(r * x, -r * 0.75, r * 0.03, '#e5e7eb');
   } else if (kind === 'chef') {
+    ctx.translate(0, -r * 0.3);
     ctx.fillStyle = '#f8fafc';
     fillDot(-r * 0.28, -r * 1.05, r * 0.28, '#f8fafc');
     fillDot(r * 0.28, -r * 1.05, r * 0.28, '#f8fafc');
     fillDot(0, -r * 1.28, r * 0.32, '#f8fafc');
     ctx.fillRect(-r * 0.42, -r * 0.85, r * 0.84, r * 0.28);
   } else if (kind === 'flower') {
+    ctx.translate(0, -r * 0.2);
     ctx.strokeStyle = '#4ade80';
-    ctx.lineWidth = Math.max(1.2, r * 0.08);
+    ctx.lineWidth = Math.max(1.2, r * 0.07);
     ctx.beginPath();
-    ctx.arc(0, -r * 0.15, r * 0.72, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.moveTo(-r * 0.22, -r * 0.98);
+    ctx.quadraticCurveTo(0, -r * 1.08, r * 0.22, -r * 0.98);
     ctx.stroke();
     const petals = ['#fb7185', '#fbbf24', '#f472b6', '#38bdf8', '#a3e635'];
     petals.forEach((color, index) => {
@@ -2195,6 +2204,7 @@ function drawHat(kind, radius, accent) {
     ctx.fillRect(-r * 0.9, -r * 0.28, r * 0.12, r * 0.28);
     ctx.fillRect(r * 0.78, -r * 0.28, r * 0.12, r * 0.28);
   } else if (kind === 'banana') {
+    ctx.translate(0, -r * 0.58);
     ctx.fillStyle = '#f5d90a';
     ctx.beginPath();
     ctx.moveTo(-r * 0.2, -r * 0.4);
