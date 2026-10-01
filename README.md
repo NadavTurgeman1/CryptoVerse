@@ -28,6 +28,26 @@ npm test
 npm run build
 ```
 
+## Installable build
+
+The phone build is a Capacitor shell around this same game. The bundle id is `com.nadavturgeman.cryptoverse`. Change it in `capacitor.config.json` before the first store upload if you want a different one.
+
+On a Mac, with Xcode installed:
+
+```bash
+npm install
+npm run build
+npx cap add ios
+npx cap add android
+npx @capacitor/assets generate --iconBackgroundColor '#05060c' --splashBackgroundColor '#05060c'
+npx cap sync
+npx cap open ios
+```
+
+In Xcode, pick your Apple ID team and run it on your iPhone. A free Apple ID can install the app on your own phone. That copy expires after about 7 days and is not TestFlight. TestFlight, and sending a build to friends, needs the paid Apple Developer Program.
+
+Android Studio can open the `android` project the same way. A Play Console account is only required when you want a store or testing-track link.
+
 ## How to play
 
 - Slide a finger or the pointer anywhere. The fireball moves by that same distance and direction, and a tap does not send it to the pointer. Arrow keys / WASD still work.

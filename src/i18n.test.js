@@ -26,6 +26,17 @@ test('language stays English unless the browser prefers a language we ship', () 
   assert.equal(translate('ar', 'shop'), 'المتجر');
 });
 
+test('pause and how-to lines exist in every language', () => {
+  for (const lang of UI_LANGS) {
+    for (const key of ['howTo', 'paused', 'resume', 'pauseBtn']) {
+      const value = STRINGS[lang][key];
+      assert.equal(typeof value, 'string', `${lang}.${key}`);
+      assert.equal(value.length > 0, true, `${lang}.${key}`);
+      assert.equal(translate(lang, key), value);
+    }
+  }
+});
+
 test('every shop item has its own name in every language', () => {
   const keys = [
     'rose', 'cyan', 'violet', 'matrix', 'gold', 'ember', 'lime', 'ice', 'magenta', 'royal',

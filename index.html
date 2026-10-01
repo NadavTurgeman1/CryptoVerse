@@ -6,12 +6,17 @@
     <meta name="theme-color" content="#0d0f18" />
     <title>CryptoVerse</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <div id="game-container" data-state="MENU">
       <div id="hud">
         <div id="power-bar">
+          <button type="button" class="power-btn" id="pause-btn" data-i18n-aria="pauseBtn" aria-label="Pause">
+            <span class="pause-mark" aria-hidden="true"></span>
+          </button>
           <button type="button" class="power-btn" id="use-missile" data-i18n-aria="fireMissile" aria-label="Fire stored missile">
             <canvas class="power-icon" id="missile-icon" width="64" height="64"></canvas>
             <span class="power-count" id="missile-stock">0</span>
@@ -40,6 +45,7 @@
       <div id="main-menu" class="screen">
         <h1 class="logo"><span class="logo-crypto">Crypto</span><span class="logo-verse">Verse</span></h1>
         <p class="best" id="menu-best">No record yet</p>
+        <p class="how-to" data-i18n="howTo">Slide to move. Collect 3 coins. Your route comes back.</p>
         <button type="button" class="btn" id="start-btn" data-i18n="play">Play</button>
         <button type="button" class="btn btn-secondary" id="shop-btn" data-i18n="shop">Shop</button>
         <div id="lang-prompt" class="lang-prompt hidden">
@@ -123,6 +129,13 @@
             </select>
           </label>
         </div>
+      </div>
+
+      <div id="pause-screen" class="screen hidden">
+        <h1 data-i18n="paused">Paused</h1>
+        <p class="how-to" data-i18n="howTo">Slide to move. Collect 3 coins. Your route comes back.</p>
+        <button type="button" class="btn" id="resume-btn" data-i18n="resume">Resume</button>
+        <button type="button" class="btn btn-secondary" id="pause-menu-btn" data-i18n="mainMenu">Main menu</button>
       </div>
 
       <div id="game-over-screen" class="screen hidden">

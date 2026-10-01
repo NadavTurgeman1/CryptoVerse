@@ -20,6 +20,8 @@ import {
   takeOverlaps,
 } from './logic.js';
 import { UI_LANGS, languageOffer, translate } from './i18n.js';
+import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 
 const COLORS = [
   { id: '#ff2a55', nameKey: 'rose', price: 0, slot: 'color' },
@@ -1049,6 +1051,27 @@ function returnToMenu() {
   setMode('MENU');
   showScreen('main-menu');
   syncMenu();
+  if (settings.music) AudioEngine.startMusic();
+}
+
+function pauseGame() {
+  if (gameState !== 'PLAYING') return;
+  keys.clear();
+  endDrag();
+  clearJoystick();
+  accumulator = 0;
+  AudioEngine.stopMusic();
+  setMode('PAUSED');
+  showScreen('pause-screen');
+  announce(t('paused'));
+}
+
+function resumeGame() {
+  if (gameState !== 'PAUSED') return;
+  hideScreens();
+  setMode('PLAYING');
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  if (settings.music) AudioEngine.startMusic();
 }
 
 function openShop() {
@@ -3367,6 +3390,12 @@ function bindInput() {
   });
 
   window.addEventListener('keydown', (event) => {
+    if (event.code === 'Escape') {
+      event.preventDefault();
+      if (gameState === 'PLAYING') pauseGame();
+      else if (gameState === 'PAUSED') resumeGame();
+      return;
+    }
     if (gameState === 'PLAYING' && event.code === 'KeyM') {
       event.preventDefault();
       useStoredMissile();
@@ -3389,7 +3418,17 @@ function bindInput() {
     isDragging = false;
     slide = null;
     clearJoystick();
+    pauseGame();
   });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') pauseGame();
+  });
+  window.addEventListener('pagehide', () => pauseGame());
+  if (Capacitor.isNativePlatform()) {
+    App.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive) pauseGame();
+    });
+  }
   window.addEventListener('resize', resizeCanvas);
 }
 
@@ -3401,6 +3440,9 @@ function bindUI() {
   document.getElementById('open-settings').addEventListener('click', openSettings);
   document.getElementById('close-settings').addEventListener('click', closeOverlay);
   document.getElementById('menu-btn').addEventListener('click', returnToMenu);
+  document.getElementById('pause-btn').addEventListener('click', pauseGame);
+  document.getElementById('resume-btn').addEventListener('click', resumeGame);
+  document.getElementById('pause-menu-btn').addEventListener('click', returnToMenu);
   document.getElementById('try-on-buy').addEventListener('click', confirmTryOn);
   document.getElementById('use-missile').addEventListener('click', useStoredMissile);
   document.getElementById('use-shield').addEventListener('click', useStoredShield);
@@ -3445,6 +3487,8 @@ requestAnimationFrame(frame);
 if (import.meta.env.DEV) {
   window.__echo = {
     start: startGame,
+    pause: pauseGame,
+    resume: resumeGame,
     openShop,
     closeShop,
     returnToMenu,

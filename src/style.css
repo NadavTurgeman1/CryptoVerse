@@ -104,6 +104,11 @@ body {
   #controls-hint {
     font-size: 0.72rem;
   }
+
+  .how-to {
+    margin-bottom: 6px;
+    font-size: 0.78rem;
+  }
 }
 
 #gameCanvas {
@@ -146,6 +151,20 @@ body {
 
 #game-over-screen {
   background: rgba(13, 15, 24, 0.86);
+}
+
+#pause-screen {
+  z-index: 20;
+  background: rgba(8, 10, 18, 0.78);
+}
+
+.how-to {
+  max-width: 18rem;
+  margin: 0 0 14px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.35;
 }
 
 .logo {
@@ -671,6 +690,16 @@ h1 {
 
 .power-btn.empty {
   opacity: 0.5;
+}
+
+.pause-mark {
+  width: 14px;
+  height: 16px;
+  display: block;
+  pointer-events: none;
+  background:
+    linear-gradient(#f0c14b, #f0c14b) left center / 4px 100% no-repeat,
+    linear-gradient(#f0c14b, #f0c14b) right center / 4px 100% no-repeat;
 }
 
 .power-icon,
