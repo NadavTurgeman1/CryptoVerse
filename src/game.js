@@ -1235,16 +1235,6 @@ function movePlayer() {
   player.targetY = clampToField(player.targetY, player.radius, view.h - player.radius);
   player.vx = player.x - previousX;
   player.vy = player.y - previousY;
-  if (player.vx * player.vx + player.vy * player.vy > 0.8 && particles.length < 70 && Math.random() < 0.45) {
-    particles.push({
-      x: player.x - player.vx * 2,
-      y: player.y - player.vy * 2,
-      vx: -player.vx * 0.15 + (Math.random() - 0.5) * 0.4,
-      vy: -player.vy * 0.15 - 0.25,
-      life: 14,
-      color: Math.random() < 0.45 ? '#fff1c2' : '#ff6a00',
-    });
-  }
 }
 
 function stepParticles() {
@@ -1472,27 +1462,64 @@ function proximity(x, y) {
   return clamp(1 - dist / 250, 0, 1);
 }
 
+function resamplePath(points, spacing) {
+  if (points.length < 2) return points;
+  const out = [points[0]];
+  let anchor = points[0];
+  for (let i = 1; i < points.length; i += 1) {
+    const point = points[i];
+    const dist = Math.hypot(point.x - anchor.x, point.y - anchor.y);
+    const last = i === points.length - 1;
+    if (dist >= spacing || (last && dist > 0.5)) {
+      out.push(point);
+      anchor = point;
+    }
+  }
+  return out;
+}
+
+function traceRibbon(points) {
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i += 1) ctx.lineTo(points[i].x, points[i].y);
+}
+
 function drawLitRibbon(points, color, width, alpha) {
-  if (points.length < 2) return;
-  const step = Math.max(1, Math.floor(points.length / 220));
+  const ribbon = resamplePath(points, 8);
+  if (ribbon.length < 2) return;
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  for (let i = 0; i < points.length - 1; i += step) {
-    const start = points[i];
-    const end = points[Math.min(points.length - 1, i + step)];
-    const near = proximity((start.x + end.x) / 2, (start.y + end.y) / 2);
-    const strength = 0.62 + near * 1.25;
-    ctx.beginPath();
-    ctx.moveTo(start.x, start.y);
-    ctx.lineTo(end.x, end.y);
-    ctx.strokeStyle = hexAlpha(color, Math.min(0.95, alpha * 0.42 * strength));
-    ctx.lineWidth = width * (3.4 + near * 3.2);
-    ctx.stroke();
-    ctx.strokeStyle = hexAlpha(color, Math.min(1, alpha * strength));
-    ctx.lineWidth = width * (1.25 + near * 1.45);
-    ctx.stroke();
+  traceRibbon(ribbon);
+  ctx.strokeStyle = hexAlpha(color, Math.min(0.5, alpha * 0.32));
+  ctx.lineWidth = width * 3.1;
+  ctx.stroke();
+  ctx.strokeStyle = hexAlpha(color, Math.min(1, alpha * 0.82));
+  ctx.lineWidth = width * 1.15;
+  ctx.stroke();
+
+  let run = [];
+  const paintRun = () => {
+    if (run.length < 2) {
+      run = [];
+      return;
+    }
+    const span = Math.hypot(run[run.length - 1].x - run[0].x, run[run.length - 1].y - run[0].y);
+    if (span >= 28) {
+      const mid = run[Math.floor(run.length / 2)];
+      const near = proximity(mid.x, mid.y);
+      traceRibbon(run);
+      ctx.strokeStyle = hexAlpha(color, Math.min(1, alpha * (0.55 + near * 0.45)));
+      ctx.lineWidth = width * (1.35 + near * 0.7);
+      ctx.stroke();
+    }
+    run = [];
+  };
+  for (const point of ribbon) {
+    if (proximity(point.x, point.y) > 0.22) run.push(point);
+    else paintRun();
   }
+  paintRun();
   ctx.restore();
 }
 
@@ -1604,49 +1631,35 @@ function trailStrength(point) {
   return 1 - fade;
 }
 
-function drawAgedStroke(points, width, rgb, peak) {
+function drawFireTrail(points) {
   let first = 0;
   while (first < points.length - 1 && trailStrength(points[first]) <= 0) first += 1;
-  if (points.length - first < 2) return;
-  ctx.lineWidth = width;
-  const last = points.length - 1;
-  const step = Math.max(1, Math.ceil((last - first) / 24));
-  for (let start = first; start < last; start += step) {
-    const end = Math.min(last, start + step);
-    const alpha = peak * trailStrength(points[end]);
-    if (alpha < 0.015) continue;
-    ctx.strokeStyle = `rgba(${rgb}, ${alpha})`;
-    ctx.beginPath();
-    ctx.moveTo(points[start].x, points[start].y);
-    for (let i = start + 1; i <= end; i += 1) ctx.lineTo(points[i].x, points[i].y);
-    ctx.stroke();
-  }
-}
-
-function drawFireTrail(points) {
-  if (points.length < 2) return;
+  const visible = points.slice(first);
+  const ribbon = resamplePath(visible, 8);
+  if (ribbon.length < 2) return;
+  const cut = ribbon.findIndex((point) => trailStrength(point) >= 0.92);
+  const tail = cut > 0 ? ribbon.slice(0, cut + 1) : null;
+  const body = cut > 0 ? ribbon.slice(cut) : ribbon;
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  drawAgedStroke(points, 18, '255, 48, 0', 0.28);
-  drawAgedStroke(points, 8, '255, 122, 16', 0.78);
-  drawAgedStroke(points, 2.6, '255, 236, 176', 0.9);
-
-  const wobble = performance.now() / 70;
-  for (let i = 0; i < points.length; i += 1) {
-    const strength = trailStrength(points[i]);
-    if (strength <= 0) continue;
-    ctx.globalAlpha = strength * 0.9;
-    ctx.fillStyle = strength > 0.85 ? '#fff3c8' : '#ff5310';
-    ctx.beginPath();
-    ctx.arc(
-      points[i].x,
-      points[i].y + Math.sin(wobble + i) * 1.6,
-      1.6 + strength * 4.2,
-      0,
-      Math.PI * 2,
-    );
-    ctx.fill();
+  const layers = [
+    [15, '255, 48, 0', 0.26],
+    [6.5, '255, 122, 16', 0.8],
+    [2.2, '255, 236, 176', 0.92],
+  ];
+  for (const [width, rgb, peak] of layers) {
+    ctx.lineWidth = width;
+    if (tail && tail.length >= 2) {
+      traceRibbon(tail);
+      ctx.strokeStyle = `rgba(${rgb}, ${peak * 0.28})`;
+      ctx.stroke();
+    }
+    if (body.length >= 2) {
+      traceRibbon(body);
+      ctx.strokeStyle = `rgba(${rgb}, ${peak})`;
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }

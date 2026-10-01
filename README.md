@@ -2,7 +2,7 @@
 
 A one-screen arcade game. You slide a fireball through a dark starfield, grab three crypto coins to finish a round, and then your route comes back as an echo. Later rounds play every previous route at the same time, a little faster each round, with the coins pulled closer together and a shorter moment of safety when the next echo wakes. Dollars stay in the shop between runs and dress the echoes.
 
-The interface is in English by default. A gear on the home screen opens music, volume, effect, and language settings. French, Spanish, German, and Hebrew are included, each with its flag.
+The interface is in English by default. A gear on the home screen opens music, volume, effect, and language settings. French, Spanish, German, Hebrew, and Arabic are included, each with its flag.
 
 ## Run locally
 

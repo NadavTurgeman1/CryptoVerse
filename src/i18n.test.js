@@ -15,10 +15,13 @@ test('language stays English unless the browser prefers a language we ship', () 
   assert.equal(languageOffer(['fr-FR', 'he'], null), 'fr');
   assert.equal(languageOffer(['es', 'en'], null), 'es');
   assert.equal(languageOffer(['de-DE'], null), 'de');
+  assert.equal(languageOffer(['ar-SA', 'en'], null), 'ar');
   assert.equal(languageOffer(['fr', 'de'], null), 'fr');
   assert.equal(languageOffer(['he'], 'en'), null);
   assert.equal(languageOffer(['de'], 'fr'), null);
   assert.equal(translate('fr', 'play'), 'Jouer');
   assert.equal(translate('es', 'shop'), 'Tienda');
   assert.equal(translate('de', 'back'), 'Zurück');
+  assert.equal(translate('ar', 'play'), 'العب');
+  assert.equal(translate('ar', 'shop'), 'المتجر');
 });
