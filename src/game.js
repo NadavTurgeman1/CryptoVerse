@@ -3018,6 +3018,7 @@ function drawCryptoCoin(x, y, radius, kind) {
   ctx.arc(0, 0, radius * 2.5, 0, Math.PI * 2);
   ctx.fill();
 
+  ctx.globalAlpha = 0.88;
   ctx.fillStyle = '#4e2c0a';
   ctx.beginPath();
   ctx.arc(0, radius * 0.1, radius, 0, Math.PI * 2);
