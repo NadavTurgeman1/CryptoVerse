@@ -155,9 +155,8 @@ const KEY_CODES = new Set([
 
 const AudioEngine = {
   ctx: null,
-  musicOn: true,
-  effectsOn: true,
-  volume: 0.7,
+  musicVolume: 0.7,
+  sfxVolume: 0.7,
   musicTimer: null,
   musicStep: 0,
   unlock() {
@@ -165,24 +164,24 @@ const AudioEngine = {
     if (!AudioCtx) return;
     if (!this.ctx) this.ctx = new AudioCtx();
     if (this.ctx.state === 'suspended') void this.ctx.resume();
-    if (this.musicOn) this.startMusic();
+    if (this.musicVolume > 0) this.startMusic();
   },
   apply(next) {
-    this.musicOn = Boolean(next.music);
-    this.effectsOn = next.effects !== false;
-    this.volume = clamp(Number(next.volume) || 0, 0, 1);
-    if (this.musicOn && this.ctx) this.startMusic();
+    this.musicVolume = clamp(Number(next.music) || 0, 0, 1);
+    this.sfxVolume = clamp(Number(next.sfx) || 0, 0, 1);
+    if (this.musicVolume > 0 && this.ctx) this.startMusic();
     else this.stopMusic();
   },
   play(freq, type, duration, level = 0.08, music = false) {
     try {
-      if (music ? !this.musicOn : !this.effectsOn) return;
+      const volume = music ? this.musicVolume : this.sfxVolume;
+      if (volume <= 0) return;
       if (!this.ctx) this.unlock();
       if (!this.ctx) return;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       const now = this.ctx.currentTime;
-      const peak = Math.max(0.0001, level * this.volume);
+      const peak = Math.max(0.0001, level * volume);
       osc.type = type;
       osc.frequency.setValueAtTime(freq, now);
       gain.gain.setValueAtTime(peak, now);
@@ -196,11 +195,11 @@ const AudioEngine = {
     }
   },
   startMusic() {
-    if (this.musicTimer || !this.musicOn) return;
+    if (this.musicTimer || this.musicVolume <= 0) return;
     this.musicTimer = -1;
     const notes = [196, 247, 294, 330, 294, 247];
     const tick = () => {
-      if (!this.musicOn) {
+      if (this.musicVolume <= 0) {
         this.musicTimer = null;
         return;
       }
@@ -260,7 +259,7 @@ let bestRound = 0;
 let gamesPlayed = 0;
 let missileStock = 0;
 let shieldStock = 0;
-let settings = { music: true, volume: 0.7, effects: true, lang: 'en' };
+let settings = { music: 0.7, sfx: 0.7, lang: 'en' };
 let shieldLayers = [];
 
 const player = { x: 240, y: 400, radius: 14, targetX: 240, targetY: 400, vx: 0, vy: 0 };
@@ -343,12 +342,18 @@ function itemLabel(item) {
   return t(item.nameKey);
 }
 
+function savedLevel(value, fallback) {
+  if (typeof value === 'number') return clamp(value, 0, 1);
+  if (value === false) return 0;
+  return fallback;
+}
+
 function loadSettings() {
   const saved = safeJson(storageGet(STORAGE.settings), {});
+  const legacy = typeof saved.volume === 'number' ? clamp(saved.volume, 0, 1) : 0.7;
   settings = {
-    music: saved.music !== false,
-    volume: typeof saved.volume === 'number' ? clamp(saved.volume, 0, 1) : 0.7,
-    effects: saved.effects !== false,
+    music: savedLevel(saved.music, legacy),
+    sfx: savedLevel(saved.sfx, saved.effects === false ? 0 : legacy),
     lang: isUiLang(saved.lang) ? saved.lang : 'en',
   };
   AudioEngine.apply(settings);
@@ -433,15 +438,15 @@ function maybeShowTutorial() {
 
 function syncSettingsForm() {
   const music = document.getElementById('set-music');
-  const volume = document.getElementById('set-volume');
-  const effects = document.getElementById('set-effects');
+  const sfx = document.getElementById('set-sfx');
   const language = document.getElementById('set-language');
-  const readout = document.getElementById('volume-readout');
-  if (music) music.checked = settings.music;
-  if (effects) effects.checked = settings.effects;
-  if (volume) volume.value = String(Math.round(settings.volume * 100));
+  const musicReadout = document.getElementById('music-readout');
+  const sfxReadout = document.getElementById('sfx-readout');
+  if (music) music.value = String(Math.round(settings.music * 100));
+  if (sfx) sfx.value = String(Math.round(settings.sfx * 100));
   if (language) language.value = settings.lang;
-  if (readout) readout.textContent = String(Math.round(settings.volume * 100));
+  if (musicReadout) musicReadout.textContent = String(Math.round(settings.music * 100));
+  if (sfxReadout) sfxReadout.textContent = String(Math.round(settings.sfx * 100));
 }
 
 function loadSave() {
@@ -1088,7 +1093,7 @@ function returnToMenu() {
   setMode('MENU');
   showScreen('main-menu');
   syncMenu();
-  if (settings.music) AudioEngine.startMusic();
+  if (settings.music > 0) AudioEngine.startMusic();
 }
 
 function pauseGame() {
@@ -1108,7 +1113,7 @@ function resumeGame() {
   hideScreens();
   setMode('PLAYING');
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-  if (settings.music) AudioEngine.startMusic();
+  if (settings.music > 0) AudioEngine.startMusic();
 }
 
 function openShop() {
@@ -2110,7 +2115,7 @@ function drawHat(kind, radius, accent) {
     ctx.fill();
     drawCrownShape(r, true);
   } else if (kind === 'santa') {
-    ctx.translate(0, -r * 0.38);
+    ctx.translate(0, -r * 0.54);
     ctx.fillStyle = '#d0122d';
     ctx.beginPath();
     ctx.moveTo(-r * 0.72, -r * 0.55);
@@ -3013,11 +3018,6 @@ function drawCryptoCoin(x, y, radius, kind) {
   ctx.arc(0, 0, radius * 2.5, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
-  ctx.beginPath();
-  ctx.ellipse(1, radius * 1.02, radius * 0.86, radius * 0.26, 0, 0, Math.PI * 2);
-  ctx.fill();
-
   ctx.fillStyle = '#4e2c0a';
   ctx.beginPath();
   ctx.arc(0, radius * 0.1, radius, 0, Math.PI * 2);
@@ -3110,10 +3110,8 @@ function drawSceneLights() {
 }
 
 function drawPickups() {
-  const now = performance.now();
-  collectibles.forEach((coin, index) => {
-    const bob = Math.sin(now / 220 + index) * 3;
-    drawCryptoCoin(coin.x, coin.y + bob, coin.radius, coinById(coin.kind).id);
+  collectibles.forEach((coin) => {
+    drawCryptoCoin(coin.x, coin.y, coin.radius, coinById(coin.kind).id);
   });
 
   for (const power of powerups) {
@@ -3656,20 +3654,19 @@ function bindUI() {
   document.getElementById('try-on-buy').addEventListener('click', confirmTryOn);
   document.getElementById('use-missile').addEventListener('click', useStoredMissile);
   document.getElementById('use-shield').addEventListener('click', useStoredShield);
-  document.getElementById('set-music').addEventListener('change', (event) => {
+  document.getElementById('set-music').addEventListener('input', (event) => {
     AudioEngine.unlock();
-    settings.music = event.target.checked;
+    settings.music = Number(event.target.value) / 100;
+    document.getElementById('music-readout').textContent = event.target.value;
     saveSettings();
   });
-  document.getElementById('set-effects').addEventListener('change', (event) => {
-    settings.effects = event.target.checked;
+  document.getElementById('set-sfx').addEventListener('input', (event) => {
+    settings.sfx = Number(event.target.value) / 100;
+    document.getElementById('sfx-readout').textContent = event.target.value;
     saveSettings();
-    if (settings.effects) AudioEngine.coin();
   });
-  document.getElementById('set-volume').addEventListener('input', (event) => {
-    settings.volume = Number(event.target.value) / 100;
-    document.getElementById('volume-readout').textContent = event.target.value;
-    saveSettings();
+  document.getElementById('set-sfx').addEventListener('change', () => {
+    if (settings.sfx > 0) AudioEngine.coin();
   });
   document.getElementById('set-language').addEventListener('change', (event) => {
     chooseLanguage(event.target.value);

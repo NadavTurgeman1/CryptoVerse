@@ -108,15 +108,11 @@
         <div class="panel-box">
           <label class="setting-row">
             <span data-i18n="music">Music</span>
-            <input type="checkbox" id="set-music" role="switch" checked />
+            <span class="volume-wrap"><input type="range" id="set-music" min="0" max="100" value="70" /><span id="music-readout">70</span></span>
           </label>
           <label class="setting-row">
-            <span data-i18n="volume">Volume</span>
-            <span class="volume-wrap"><input type="range" id="set-volume" min="0" max="100" value="70" /><span id="volume-readout">70</span></span>
-          </label>
-          <label class="setting-row">
-            <span data-i18n="effects">Effects</span>
-            <input type="checkbox" id="set-effects" role="switch" checked />
+            <span data-i18n="sfx">SFX</span>
+            <span class="volume-wrap"><input type="range" id="set-sfx" min="0" max="100" value="70" /><span id="sfx-readout">70</span></span>
           </label>
           <label class="setting-row">
             <span data-i18n="language">Language</span>
