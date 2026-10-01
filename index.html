@@ -47,6 +47,7 @@
         <p class="best" id="menu-best">No record yet</p>
         <p class="how-to" data-i18n="howTo">Slide to move. Collect 3 coins. Your route comes back.</p>
         <button type="button" class="btn" id="start-btn" data-i18n="play">Play</button>
+        <button type="button" class="btn btn-secondary" id="tutorial-btn" data-i18n="tutorial">Tutorial</button>
         <button type="button" class="btn btn-secondary" id="shop-btn" data-i18n="shop">Shop</button>
         <div id="lang-prompt" class="lang-prompt hidden">
           <p id="lang-prompt-text">הממשק זמין גם בעברית</p>
@@ -129,6 +130,17 @@
             </select>
           </label>
         </div>
+      </div>
+
+      <div id="tutorial-screen" class="screen hidden">
+        <h1 data-i18n="tutorial">Tutorial</h1>
+        <div class="panel-box tutorial-copy">
+          <p data-i18n="tutorialMove">Slide anywhere to move the fireball.</p>
+          <p data-i18n="tutorialCoins">Collect 3 coins. The path you drew comes back as an echo.</p>
+          <p data-i18n="tutorialMissile">A stored missile removes the oldest echo.</p>
+          <p data-i18n="tutorialShield">A stored shield blocks the next hit, then drops.</p>
+        </div>
+        <button type="button" class="btn" id="close-tutorial" data-i18n="gotIt">Got it</button>
       </div>
 
       <div id="pause-screen" class="screen hidden">

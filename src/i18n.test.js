@@ -28,7 +28,7 @@ test('language stays English unless the browser prefers a language we ship', () 
 
 test('pause and how-to lines exist in every language', () => {
   for (const lang of UI_LANGS) {
-    for (const key of ['howTo', 'paused', 'resume', 'pauseBtn']) {
+    for (const key of ['howTo', 'paused', 'resume', 'pauseBtn', 'tutorial', 'gotIt', 'tutorialMove', 'tutorialCoins', 'tutorialMissile', 'tutorialShield']) {
       const value = STRINGS[lang][key];
       assert.equal(typeof value, 'string', `${lang}.${key}`);
       assert.equal(value.length > 0, true, `${lang}.${key}`);

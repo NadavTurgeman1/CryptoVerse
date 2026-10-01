@@ -22,6 +22,7 @@ import {
 import { UI_LANGS, languageOffer, translate } from './i18n.js';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 
 const COLORS = [
   { id: '#ff2a55', nameKey: 'rose', price: 0, slot: 'color' },
@@ -131,6 +132,7 @@ const STORAGE = {
   missiles: 'echo_missile_stock',
   shields: 'echo_shield_stock',
   settings: 'echo_settings',
+  tutorial: 'echo_tutorial_seen',
 };
 
 const STEP = 1000 / 60;
@@ -396,6 +398,37 @@ function chooseLanguage(lang) {
   saveSettings();
   applyLanguage();
   document.getElementById('lang-prompt')?.classList.add('hidden');
+  maybeShowTutorial();
+}
+
+function buzz(kind) {
+  if (Capacitor.isNativePlatform()) {
+    const pulse = kind === 'death'
+      ? Haptics.notification({ type: NotificationType.Error })
+      : Haptics.impact({ style: kind === 'shield' ? ImpactStyle.Medium : ImpactStyle.Light });
+    void pulse.catch(() => {});
+    return;
+  }
+  if (typeof navigator.vibrate !== 'function') return;
+  navigator.vibrate(kind === 'death' ? [24, 36, 70] : kind === 'shield' ? 22 : 14);
+}
+
+function openTutorial() {
+  setMode('MENU');
+  showScreen('tutorial-screen');
+}
+
+function closeTutorial() {
+  storageSet(STORAGE.tutorial, '1');
+  showScreen('main-menu');
+  syncMenu();
+}
+
+function maybeShowTutorial() {
+  if (storageGet(STORAGE.tutorial)) return;
+  if (!document.getElementById('lang-prompt')?.classList.contains('hidden')) return;
+  if (gameState !== 'MENU') return;
+  openTutorial();
 }
 
 function syncSettingsForm() {
@@ -715,7 +748,11 @@ function renderPowers() {
     button.className = 'btn power-buy';
     button.disabled = coins < item.price;
     button.textContent = coins >= item.price ? t('buy', { price: item.price }) : t('need', { price: item.price });
-    button.addEventListener('click', () => buyPower(item));
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      buyPower(item);
+    });
+    row.addEventListener('click', () => showToast(t(item.detailKey)));
     row.append(iconWrap, copy, button);
     root.append(row);
   }
@@ -1194,6 +1231,7 @@ function detonateMissile(x, y, hit) {
   echoes = next.echoes;
   addScore(20);
   AudioEngine.blast();
+  buzz('missile');
   showToast(t('echoDestroyed'));
   announce(t('echoDestroyed'));
 }
@@ -1325,6 +1363,7 @@ function absorbShieldHit() {
   grace = Math.max(grace, SHIELD_END_GRACE);
   burst(player.x, player.y, '#7af6ff');
   AudioEngine.shieldBreak();
+  buzz('shield');
 }
 
 function update() {
@@ -1361,6 +1400,7 @@ function update() {
 function gameOver() {
   shieldLayers = [];
   AudioEngine.hit();
+  buzz('death');
   shake = 14;
   const hadRecord = bestScore > 0 || bestRound > 0;
   const scoreRecord = score > bestScore;
@@ -1426,33 +1466,42 @@ function ensureStars() {
 
   const area = view.w * view.h;
   const galaxies = [];
-  const galaxyCount = Math.min(4, Math.max(2, Math.round(area / 170000)));
-  for (let i = 0; i < galaxyCount; i += 1) {
-    const disk = rand() > 0.28;
+  const layouts = [
+    { disk: false },
+    { disk: false },
+    { disk: true },
+  ];
+  if (area > 500000) layouts.push({ disk: true });
+  for (const layout of layouts) {
     const specks = [];
-    const speckCount = disk ? 5 : 8;
+    const spread = layout.disk ? 10 : 16 + rand() * 10;
+    const speckCount = layout.disk ? 7 : 14;
     for (let s = 0; s < speckCount; s += 1) {
-      const spread = disk ? 1 : 7;
-      specks.push({ x: (rand() - 0.5) * spread * 2, y: (rand() - 0.5) * spread * 2 });
+      specks.push({
+        x: (rand() - 0.5) * spread * 2,
+        y: (rand() - 0.5) * spread * 2,
+        r: layout.disk ? 0.7 : 0.6 + rand() * 0.8,
+      });
     }
     galaxies.push({
-      x: view.w * (0.12 + rand() * 0.76),
-      y: view.h * (0.1 + rand() * 0.8),
-      rx: 16 + rand() * 26,
-      ry: 4 + rand() * 7,
+      x: view.w * (0.16 + rand() * 0.68),
+      y: view.h * (0.14 + rand() * 0.7),
+      rx: 22 + rand() * 20,
+      ry: 7 + rand() * 6,
       rot: rand() * Math.PI,
-      disk,
+      disk: layout.disk,
       dust: rand() > 0.5 ? '150, 168, 214' : '176, 150, 186',
       core: rand() > 0.5 ? '214, 224, 255' : '255, 236, 214',
+      haze: layout.disk ? 0 : spread,
       specks,
     });
   }
 
-  const nebulaColors = ['118, 96, 168', '78, 124, 168', '156, 96, 118', '86, 132, 138'];
+  const nebulaColors = ['138, 108, 196', '86, 142, 196', '176, 104, 132', '92, 156, 158'];
   const nebulae = nebulaColors.slice(0, area > 500000 ? 4 : 3).map((color) => ({
-    x: view.w * (0.15 + rand() * 0.7),
-    y: view.h * (0.12 + rand() * 0.76),
-    r: Math.min(view.w, view.h) * (0.14 + rand() * 0.1),
+    x: view.w * (0.18 + rand() * 0.64),
+    y: view.h * (0.16 + rand() * 0.68),
+    r: Math.min(view.w, view.h) * (0.2 + rand() * 0.1),
     color,
     phase: rand() * Math.PI * 2,
     drift: 10 + rand() * 16,
@@ -1479,8 +1528,8 @@ function drawNebulae(now) {
     const x = cloud.x + Math.sin(now * 0.045 + cloud.phase) * cloud.drift;
     const y = cloud.y + Math.cos(now * 0.037 + cloud.phase) * cloud.drift * 0.55;
     const glow = ctx.createRadialGradient(x, y, 0, x, y, cloud.r);
-    glow.addColorStop(0, `rgba(${cloud.color}, 0.075)`);
-    glow.addColorStop(0.42, `rgba(${cloud.color}, 0.028)`);
+    glow.addColorStop(0, `rgba(${cloud.color}, 0.16)`);
+    glow.addColorStop(0.42, `rgba(${cloud.color}, 0.07)`);
     glow.addColorStop(1, `rgba(${cloud.color}, 0)`);
     ctx.fillStyle = glow;
     ctx.beginPath();
@@ -1491,7 +1540,7 @@ function drawNebulae(now) {
     const wy = y - cloud.r * 0.12;
     const wispRadius = cloud.r * 0.48;
     const wisp = ctx.createRadialGradient(wx, wy, 0, wx, wy, wispRadius);
-    wisp.addColorStop(0, `rgba(${cloud.color}, 0.045)`);
+    wisp.addColorStop(0, `rgba(${cloud.color}, 0.09)`);
     wisp.addColorStop(1, `rgba(${cloud.color}, 0)`);
     ctx.fillStyle = wisp;
     ctx.beginPath();
@@ -1502,6 +1551,15 @@ function drawNebulae(now) {
 
 function drawGalaxies() {
   for (const galaxy of starfield.galaxies) {
+    if (!galaxy.disk && galaxy.haze) {
+      const haze = ctx.createRadialGradient(galaxy.x, galaxy.y, 0, galaxy.x, galaxy.y, galaxy.haze * 1.6);
+      haze.addColorStop(0, `rgba(${galaxy.dust}, 0.2)`);
+      haze.addColorStop(1, `rgba(${galaxy.dust}, 0)`);
+      ctx.fillStyle = haze;
+      ctx.beginPath();
+      ctx.arc(galaxy.x, galaxy.y, galaxy.haze * 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.save();
     ctx.translate(galaxy.x, galaxy.y);
     ctx.rotate(galaxy.rot);
@@ -1509,27 +1567,45 @@ function drawGalaxies() {
       ctx.scale(1, galaxy.ry / galaxy.rx);
       ctx.beginPath();
       ctx.arc(0, 0, galaxy.rx, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${galaxy.dust}, 0.11)`;
+      ctx.fillStyle = `rgba(${galaxy.dust}, 0.2)`;
       ctx.fill();
-      ctx.strokeStyle = `rgba(${galaxy.core}, 0.14)`;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(0, 0, galaxy.rx * 0.62, 0.3, 2.15);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(0, 0, galaxy.rx * 0.38, 2.5, 4.3);
-      ctx.stroke();
     }
-    ctx.fillStyle = `rgba(${galaxy.core}, ${galaxy.disk ? 0.28 : 0.22})`;
     for (const speck of galaxy.specks) {
-      ctx.fillRect(speck.x, speck.y, 1.1, 1.1);
+      ctx.fillStyle = `rgba(${galaxy.core}, ${galaxy.disk ? 0.45 : 0.62})`;
+      ctx.beginPath();
+      ctx.arc(speck.x, speck.y, speck.r, 0, Math.PI * 2);
+      ctx.fill();
     }
     ctx.restore();
-    ctx.fillStyle = `rgba(${galaxy.core}, 0.4)`;
+    ctx.fillStyle = `rgba(${galaxy.core}, 0.7)`;
     ctx.beginPath();
-    ctx.arc(galaxy.x, galaxy.y, galaxy.disk ? 1.5 : 1.1, 0, Math.PI * 2);
+    ctx.arc(galaxy.x, galaxy.y, galaxy.disk ? 1.6 : 1.25, 0, Math.PI * 2);
     ctx.fill();
   }
+}
+
+function drawTwinkle(x, y, radius, tint, rotation) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, radius * 2.4);
+  glow.addColorStop(0, `rgba(${tint}, 0.45)`);
+  glow.addColorStop(1, `rgba(${tint}, 0)`);
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 2.4, 0, Math.PI * 2);
+  ctx.fill();
+  const arm = radius * 2.4;
+  const waist = Math.max(0.35, radius * 0.28);
+  ctx.fillStyle = `rgba(${tint}, 0.92)`;
+  ctx.beginPath();
+  ctx.moveTo(0, -arm);
+  ctx.quadraticCurveTo(waist, -waist, arm * 0.72, 0);
+  ctx.quadraticCurveTo(waist, waist, 0, arm);
+  ctx.quadraticCurveTo(-waist, waist, -arm * 0.72, 0);
+  ctx.quadraticCurveTo(-waist, -waist, 0, -arm);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawComets(now) {
@@ -1603,21 +1679,16 @@ function drawAtmosphere() {
   drawNebulae(now);
   drawGalaxies();
   for (const star of starfield.points) {
+    if (star.r > 1.6) {
+      const spark = 0.78 + Math.sin(now * 1.7 + star.phase) * 0.22;
+      drawTwinkle(star.x, star.y, star.r * spark, star.tint, star.phase);
+      continue;
+    }
     const twinkle = 0.62 + Math.sin(now * 1.4 + star.phase) * 0.32;
     ctx.fillStyle = `rgba(${star.tint}, ${twinkle})`;
     ctx.beginPath();
     ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
     ctx.fill();
-    if (star.r > 1.6) {
-      ctx.strokeStyle = `rgba(${star.tint}, ${twinkle * 0.7})`;
-      ctx.lineWidth = 0.6;
-      ctx.beginPath();
-      ctx.moveTo(star.x - star.r * 2.2, star.y);
-      ctx.lineTo(star.x + star.r * 2.2, star.y);
-      ctx.moveTo(star.x, star.y - star.r * 2.2);
-      ctx.lineTo(star.x, star.y + star.r * 2.2);
-      ctx.stroke();
-    }
   }
   drawComets(now);
   ctx.restore();
@@ -3571,6 +3642,8 @@ function bindInput() {
 
 function bindUI() {
   document.getElementById('start-btn').addEventListener('click', startGame);
+  document.getElementById('tutorial-btn').addEventListener('click', openTutorial);
+  document.getElementById('close-tutorial').addEventListener('click', closeTutorial);
   document.getElementById('retry-btn').addEventListener('click', startGame);
   document.getElementById('shop-btn').addEventListener('click', openShop);
   document.getElementById('close-shop').addEventListener('click', closeShop);
@@ -3619,6 +3692,7 @@ bindInput();
 bindUI();
 applyLanguage();
 offerLanguage();
+maybeShowTutorial();
 requestAnimationFrame(frame);
 
 if (import.meta.env.DEV) {
