@@ -1888,18 +1888,32 @@ function drawHat(kind, radius, accent) {
     for (const side of [-1, 1]) {
       ctx.fillStyle = '#8a5a32';
       ctx.beginPath();
-      ctx.moveTo(side * r * 0.42, -r * 1.12);
-      ctx.quadraticCurveTo(side * r * 1.22, -r * 0.85, side * r * 1.08, r * 0.05);
-      ctx.quadraticCurveTo(side * r * 0.98, r * 0.48, side * r * 0.62, r * 0.22);
-      ctx.quadraticCurveTo(side * r * 0.55, -r * 0.35, side * r * 0.28, -r * 1.02);
+      ctx.moveTo(side * r * 0.3, -r * 1.02);
+      ctx.quadraticCurveTo(side * r * 0.16, -r * 1.42, side * r * 0.42, -r * 1.68);
+      ctx.quadraticCurveTo(side * r * 0.72, -r * 1.78, side * r * 0.78, -r * 1.42);
+      ctx.lineTo(side * r * 0.52, -r * 1.28);
+      ctx.quadraticCurveTo(side * r * 0.46, -r * 1.12, side * r * 0.48, -r * 0.98);
       ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = '#f3b6b0';
       ctx.beginPath();
-      ctx.moveTo(side * r * 0.48, -r * 0.95);
-      ctx.quadraticCurveTo(side * r * 1.02, -r * 0.7, side * r * 0.92, -r * 0.05);
-      ctx.quadraticCurveTo(side * r * 0.84, r * 0.28, side * r * 0.66, r * 0.08);
-      ctx.quadraticCurveTo(side * r * 0.58, -r * 0.4, side * r * 0.4, -r * 0.88);
+      ctx.moveTo(side * r * 0.48, -r * 1.5);
+      ctx.quadraticCurveTo(side * r * 0.92, -r * 1.62, side * r * 1.05, -r * 1.22);
+      ctx.quadraticCurveTo(side * r * 1.16, -r * 0.72, side * r * 0.74, -r * 0.58);
+      ctx.quadraticCurveTo(side * r * 0.46, -r * 0.82, side * r * 0.4, -r * 1.28);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(62, 36, 18, 0.45)';
+      ctx.lineWidth = Math.max(1, r * 0.035);
+      ctx.beginPath();
+      ctx.moveTo(side * r * 0.42, -r * 1.22);
+      ctx.quadraticCurveTo(side * r * 0.7, -r * 1.48, side * r * 0.9, -r * 1.32);
+      ctx.stroke();
+      ctx.fillStyle = '#e48aa8';
+      ctx.beginPath();
+      ctx.moveTo(side * r * 0.55, -r * 1.32);
+      ctx.quadraticCurveTo(side * r * 0.88, -r * 1.4, side * r * 0.92, -r * 1.05);
+      ctx.quadraticCurveTo(side * r * 0.9, -r * 0.74, side * r * 0.68, -r * 0.7);
+      ctx.quadraticCurveTo(side * r * 0.5, -r * 0.92, side * r * 0.48, -r * 1.2);
       ctx.closePath();
       ctx.fill();
     }
@@ -1960,26 +1974,40 @@ function drawHat(kind, radius, accent) {
     ctx.lineTo(-r * 0.14, -r * 1.06);
     ctx.stroke();
   } else if (kind === 'astro') {
-    ctx.fillStyle = '#e8eef6';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(1.5, r * 0.055);
+    ctx.strokeStyle = '#1e293b';
+    ctx.fillStyle = '#f8fafc';
     ctx.beginPath();
-    ctx.moveTo(-r * 0.92, r * 0.05);
-    ctx.quadraticCurveTo(-r * 1.05, -r * 0.72, -r * 0.58, -r * 1.4);
-    ctx.quadraticCurveTo(0, -r * 1.78, r * 0.58, -r * 1.4);
-    ctx.quadraticCurveTo(r * 1.05, -r * 0.72, r * 0.92, r * 0.05);
+    ctx.moveTo(-r * 0.82, -r * 0.42);
+    ctx.quadraticCurveTo(-r * 0.98, -r * 1.28, 0, -r * 1.62);
+    ctx.quadraticCurveTo(r * 0.98, -r * 1.28, r * 0.82, -r * 0.42);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = 'rgba(12, 32, 58, 0.82)';
-    roundBox(-r * 0.72, -r * 0.52, r * 1.44, r * 0.58, r * 0.14);
-    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-    ctx.lineWidth = Math.max(1.2, r * 0.05);
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.42, -r * 0.34);
-    ctx.quadraticCurveTo(-r * 0.08, -r * 0.5, r * 0.2, -r * 0.26);
     ctx.stroke();
-    ctx.fillStyle = '#94a3b8';
-    ctx.fillRect(-r * 0.98, -r * 0.02, r * 1.96, r * 0.14);
-    ctx.fillStyle = '#cbd5e1';
-    ctx.fillRect(-r * 0.98, -r * 0.02, r * 1.96, r * 0.045);
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.9, -r * 0.08, r * 0.16, r * 0.28, 0, 0, Math.PI * 2);
+    ctx.ellipse(r * 0.9, -r * 0.08, r * 0.16, r * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(56, 120, 190, 0.18)';
+    ctx.beginPath();
+    ctx.roundRect(-r * 0.76, -r * 0.55, r * 1.52, r * 0.86, r * 0.26);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = Math.max(1.2, r * 0.045);
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.48, -r * 0.28);
+    ctx.quadraticCurveTo(-r * 0.12, -r * 0.46, r * 0.18, -r * 0.22);
+    ctx.stroke();
+    ctx.fillStyle = '#7dd3fc';
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = Math.max(1.5, r * 0.055);
+    ctx.beginPath();
+    ctx.roundRect(-r * 0.96, r * 0.36, r * 1.92, r * 0.16, r * 0.06);
+    ctx.fill();
+    ctx.stroke();
   } else if (kind === 'party') {
     ctx.fillStyle = '#7c3aed';
     ctx.beginPath();
@@ -2026,32 +2054,43 @@ function drawHat(kind, radius, accent) {
     ctx.ellipse(0, -r * 1.45, r * 0.55, r * 0.16, 0, 0, Math.PI * 2);
     ctx.stroke();
   } else if (kind === 'viking') {
+    for (const side of [-1, 1]) {
+      const horn = ctx.createLinearGradient(side * r * 0.4, -r * 0.7, side * r * 1.35, -r * 1.7);
+      horn.addColorStop(0, '#b7aa96');
+      horn.addColorStop(0.55, '#efe6d4');
+      horn.addColorStop(1, '#f6f1e6');
+      ctx.fillStyle = horn;
+      ctx.beginPath();
+      ctx.moveTo(side * r * 0.55, -r * 0.82);
+      ctx.quadraticCurveTo(side * r * 1.55, -r * 0.48, side * r * 1.58, -r * 1.28);
+      ctx.quadraticCurveTo(side * r * 1.48, -r * 1.92, side * r * 1.12, -r * 1.72);
+      ctx.quadraticCurveTo(side * r * 1.22, -r * 0.95, side * r * 0.48, -r * 1.08);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(110, 96, 74, 0.32)';
+      ctx.lineWidth = Math.max(0.7, r * 0.026);
+      ctx.beginPath();
+      ctx.moveTo(side * r * 0.62, -r * 0.95);
+      ctx.quadraticCurveTo(side * r * 1.28, -r * 0.72, side * r * 1.38, -r * 1.32);
+      ctx.moveTo(side * r * 0.66, -r * 0.9);
+      ctx.quadraticCurveTo(side * r * 1.12, -r * 0.88, side * r * 1.22, -r * 1.4);
+      ctx.stroke();
+    }
     ctx.fillStyle = '#9aa3ad';
+    ctx.strokeStyle = '#4b5563';
+    ctx.lineWidth = Math.max(1.3, r * 0.05);
     ctx.beginPath();
-    ctx.moveTo(-r * 0.78, -r * 0.72);
-    ctx.quadraticCurveTo(-r * 0.82, -r * 1.55, 0, -r * 1.68);
-    ctx.quadraticCurveTo(r * 0.82, -r * 1.55, r * 0.78, -r * 0.72);
+    ctx.moveTo(-r * 0.78, -r * 0.7);
+    ctx.quadraticCurveTo(-r * 0.86, -r * 1.52, 0, -r * 1.66);
+    ctx.quadraticCurveTo(r * 0.86, -r * 1.52, r * 0.78, -r * 0.7);
     ctx.closePath();
     ctx.fill();
+    ctx.stroke();
     ctx.fillStyle = '#6b7280';
-    ctx.fillRect(-r * 0.8, -r * 0.84, r * 1.6, r * 0.12);
-    ctx.fillRect(-r * 0.07, -r * 0.78, r * 0.14, r * 0.36);
-    for (const side of [-1, 1]) {
-      ctx.fillStyle = '#f5f5f4';
-      ctx.beginPath();
-      ctx.moveTo(side * r * 0.46, -r * 1.28);
-      ctx.quadraticCurveTo(side * r * 1.25, -r * 1.15, side * r * 1.15, -r * 1.72);
-      ctx.quadraticCurveTo(side * r * 0.78, -r * 1.42, side * r * 0.62, -r * 1.12);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#d6d3d1';
-      ctx.beginPath();
-      ctx.moveTo(side * r * 0.55, -r * 1.22);
-      ctx.quadraticCurveTo(side * r * 1.02, -r * 1.18, side * r * 1.02, -r * 1.58);
-      ctx.quadraticCurveTo(side * r * 0.78, -r * 1.38, side * r * 0.64, -r * 1.14);
-      ctx.closePath();
-      ctx.fill();
-    }
+    ctx.fillRect(-r * 0.1, -r * 1.5, r * 0.2, r * 0.95);
+    ctx.fillRect(-r * 0.8, -r * 0.82, r * 1.6, r * 0.14);
+    for (const y of [-1.32, -1.08, -0.84]) fillDot(0, r * y, r * 0.035, '#e5e7eb');
+    for (const x of [-0.52, -0.26, 0.26, 0.52]) fillDot(r * x, -r * 0.75, r * 0.03, '#e5e7eb');
   } else if (kind === 'chef') {
     ctx.fillStyle = '#f8fafc';
     fillDot(-r * 0.28, -r * 1.05, r * 0.28, '#f8fafc');
@@ -2071,18 +2110,63 @@ function drawHat(kind, radius, accent) {
     });
     fillDot(0, -r * 1.15, r * 0.08, '#fde68a');
   } else if (kind === 'horns') {
-    ctx.lineJoin = 'round';
-    for (const side of [-1, 1]) {
-      ctx.fillStyle = '#e11d2e';
+    const hornOutline = (side) => {
+      const steps = 16;
+      const spine = (t) => {
+        const x = side * r * (0.34 + Math.sin(t * Math.PI * 0.82) * 0.62);
+        const y = -r * (1.02 + t * 1.18);
+        return [x, y];
+      };
+      const points = Array.from({ length: steps + 1 }, (_, index) => spine(index / steps));
+      const edge = (index, sign) => {
+        const t = index / steps;
+        const current = points[index];
+        const next = points[Math.min(steps, index + 1)];
+        const prev = points[Math.max(0, index - 1)];
+        let dx = next[0] - prev[0];
+        let dy = next[1] - prev[1];
+        const length = Math.hypot(dx, dy) || 1;
+        dx /= length;
+        dy /= length;
+        const width = r * (0.2 * (1 - t) * (1 - t) + 0.012);
+        return [current[0] + -dy * width * sign, current[1] + dx * width * sign];
+      };
       ctx.beginPath();
-      ctx.moveTo(side * r * 0.36, -r * 1.12);
-      ctx.quadraticCurveTo(side * r * 1.22, -r * 1.18, side * r * 1.02, -r * 1.78);
-      ctx.quadraticCurveTo(side * r * 0.78, -r * 1.32, side * r * 0.55, -r * 1.02);
+      for (let index = 0; index <= steps; index += 1) {
+        const [x, y] = edge(index, 1);
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      for (let index = steps; index >= 0; index -= 1) {
+        const [x, y] = edge(index, -1);
+        ctx.lineTo(x, y);
+      }
       ctx.closePath();
+    };
+    for (const side of [-1, 1]) {
+      const grad = ctx.createLinearGradient(side * r * 0.2, -r * 0.95, side * r * 0.7, -r * 2.15);
+      grad.addColorStop(0, '#3f0614');
+      grad.addColorStop(0.45, '#dc2626');
+      grad.addColorStop(1, '#fda4af');
+      hornOutline(side);
+      ctx.fillStyle = grad;
       ctx.fill();
-      ctx.strokeStyle = '#7f1d1d';
-      ctx.lineWidth = Math.max(1, r * 0.04);
+      ctx.save();
+      hornOutline(side);
+      ctx.clip();
+      ctx.strokeStyle = 'rgba(60, 8, 12, 0.38)';
+      ctx.lineWidth = Math.max(0.7, r * 0.028);
+      ctx.beginPath();
+      for (const offset of [0.08, 0.16]) {
+        ctx.moveTo(side * r * (0.34 + offset), -r * 1.08);
+        ctx.bezierCurveTo(
+          side * r * (0.7 + offset), -r * 1.25,
+          side * r * (0.85 + offset * 0.4), -r * 1.7,
+          side * r * (0.55 + offset * 0.2), -r * 2.05,
+        );
+      }
       ctx.stroke();
+      ctx.restore();
     }
   } else if (kind === 'sombrero') {
     ctx.fillStyle = '#e7c27a';
