@@ -167,7 +167,11 @@ function dayStamp() {
   return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 }
 
-const DEAL_SLOTS = ['color', 'hat', 'glasses', 'player', 'trail'];
+const DEAL_BY_SUBJECT = {
+  echo: ['color', 'hat', 'glasses'],
+  player: ['player', 'trail'],
+  coins: ['coins'],
+};
 
 function dealPool(slot) {
   return (SHOP[slot] || []).filter((item) => {
@@ -197,7 +201,6 @@ function salePrice(item) {
   if (!isDailyDeal(item) || price <= 0) return price;
   return Math.max(1, Math.round(price * 0.9));
 }
-const PLAY_BOTTOM = 46;
 const COIN_RADIUS = 20;
 const COINS = [
   { id: 'btc' },
@@ -243,7 +246,7 @@ const TRAIL_HOLD = 36;
 const TRAIL_FADE = 28;
 const SHIELD_END_GRACE = 24;
 const COIN_BONUS = 5;
-const COIN_SCORE = 25;
+const COIN_SCORE = 250;
 const KEY_CODES = new Set([
   'ArrowLeft',
   'ArrowRight',
@@ -385,7 +388,7 @@ let unlockedTrails = ['classic'];
 let adProgress = {};
 let coinPack = 'gold';
 let unlockedPacks = ['gold'];
-let previewSubject = 'echo';
+let previewSubject = 'powers';
 let continued = false;
 let rateArmed = false;
 let rateSawLeave = false;
@@ -421,7 +424,8 @@ let bannerTimer = 0;
 let bannerQueue = [];
 let tutorialActive = false;
 let tutorialWallet = 0;
-let tutorialReady = false;
+let tutorialStep = '';
+let tutorialStepFrames = 0;
 let recordNoted = false;
 let recordFlash = 0;
 let coinFlashes = [];
@@ -624,14 +628,10 @@ function revealBanner() {
 }
 
 function tickBanner() {
+  if (tutorialActive && tutorialStep) return;
   if (bannerTimer <= 0) return;
   bannerTimer -= 1;
   if (bannerTimer > 0) return;
-  if (tutorialReady && bannerQueue.length === 0) {
-    tutorialReady = false;
-    advanceRound();
-    return;
-  }
   revealBanner();
 }
 
@@ -781,7 +781,6 @@ function syncHUD() {
   setText('score-val', score);
   setText('round-val', currentRound);
   setText('coins-val', coins);
-  setText('wallet-val', coins);
   setText('powerup-status', shieldStatus());
   setText('missile-stock', missileStock);
   setText('shield-stock', shieldStock);
@@ -1137,27 +1136,53 @@ function useStoredShield() {
 }
 
 function renderDeals() {
+  const fold = document.getElementById('deal-fold');
   const container = document.getElementById('deal-shop');
-  if (!container) return;
+  if (!fold || !container) return;
   container.replaceChildren();
-  for (const slot of DEAL_SLOTS) {
+  for (const slot of DEAL_BY_SUBJECT[previewSubject] || []) {
     const id = dailyDealId(slot);
     const item = id ? SHOP[slot]?.find((entry) => entry.id === id) : null;
     if (item) container.append(makeShopButton(item));
   }
+  fold.hidden = container.childElementCount === 0;
 }
+
+const FLAG_PAGE = 12;
+const flagShown = { echoFlag: FLAG_PAGE, playerFlag: FLAG_PAGE };
 
 function renderFlagGrid(containerId, slot) {
   const container = document.getElementById(containerId);
   if (!container) return;
   const searchId = slot === 'playerFlag' ? 'player-flag-search' : 'echo-flag-search';
   const query = document.getElementById(searchId)?.value.trim().toLocaleLowerCase(settings.lang) || '';
-  container.replaceChildren();
+  const equippedId = slot === 'playerFlag' ? playerFlag : ghostFlag;
+  const tryingId = hoverTry?.slot === slot ? hoverTry.id : pinnedTry[slot];
+  const pinned = [];
+  const rest = [];
   for (const flag of flagsSorted(settings.lang)) {
     const name = countryName(flag.id, settings.lang);
     if (query && !name.toLocaleLowerCase(settings.lang).includes(query) && !flag.id.includes(query)) continue;
+    if (flag.id === equippedId || flag.id === tryingId) pinned.push(flag);
+    else rest.push(flag);
+  }
+  const matches = [...pinned, ...rest];
+  const limit = flagShown[slot] || FLAG_PAGE;
+  container.replaceChildren();
+  for (const flag of matches.slice(0, limit)) {
     const item = catalogItem(slot, flag.id);
     if (item) container.append(makeShopButton(item));
+  }
+  if (matches.length > limit) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'flag-more';
+    more.textContent = t('showMore');
+    more.addEventListener('click', () => {
+      flagShown[slot] = limit + FLAG_PAGE;
+      renderFlagGrid(containerId, slot);
+    });
+    container.append(more);
   }
 }
 
@@ -1358,11 +1383,19 @@ function announce(message) {
 
 function fieldBounds() {
   return {
-    minX: 28,
-    maxX: Math.max(48, view.w - 28),
-    minY: 96,
-    maxY: Math.max(98, view.h - PLAY_BOTTOM),
+    minX: 36,
+    maxX: Math.max(72, view.w - 36),
+    minY: 112,
+    maxY: Math.max(150, view.h - 118),
   };
+}
+
+function clearOfHud(point) {
+  const bounds = fieldBounds();
+  if (point.x < bounds.minX || point.x > bounds.maxX) return false;
+  if (point.y < bounds.minY || point.y > bounds.maxY) return false;
+  if (Math.abs(point.x - view.w / 2) < 110 && point.y > view.h - 150) return false;
+  return true;
 }
 
 function ghostFrame() {
@@ -1382,12 +1415,15 @@ function spawnBlockers() {
 }
 
 function spawnPoint(cluster) {
-  const point = pickSpawn(Math.random, fieldBounds(), spawnBlockers(), cluster);
-  if (Math.hypot(point.x - player.x, point.y - player.y) >= 80) return point;
-  return {
-    x: point.x < view.w / 2 ? 36 : view.w - 36,
-    y: clamp(point.y, 110, Math.max(120, view.h - PLAY_BOTTOM)),
-  };
+  const bounds = fieldBounds();
+  let point = pickSpawn(Math.random, bounds, spawnBlockers(), cluster);
+  if (!clearOfHud(point) || Math.hypot(point.x - player.x, point.y - player.y) < 80) {
+    point = {
+      x: clamp(view.w * 0.5, bounds.minX, bounds.maxX),
+      y: clamp(view.h * 0.42, bounds.minY, bounds.maxY),
+    };
+  }
+  return point;
 }
 
 function spawnCoins() {
@@ -1415,7 +1451,7 @@ function spawnCollectibles() {
     powerups.push({
       x: point.x,
       y: point.y,
-      type: pickPowerType(Math.random, currentRound > 10),
+      type: pickPowerType(Math.random, currentRound >= 6),
     });
   }
   if (currentRound > 1 && !meteor && shouldSpawnMeteor(Math.random)) spawnMeteor();
@@ -1423,9 +1459,9 @@ function spawnCollectibles() {
 
 const METEOR_FRAMES = 34;
 
-function spawnMeteor() {
+function spawnMeteor(frames = METEOR_FRAMES) {
   const ends = pickMeteorEnds(Math.random, view.w);
-  const velocity = meteorVelocity(ends.startX, ends.endX, view.h + 48, METEOR_FRAMES);
+  const velocity = meteorVelocity(ends.startX, ends.endX, view.h + 48, frames);
   meteor = {
     x: ends.startX,
     y: -24,
@@ -1443,29 +1479,104 @@ function fieldPoint(xRatio, yRatio) {
   };
 }
 
+const TUTORIAL_METEOR_FRAMES = 100;
+
+function showLesson(step, key) {
+  tutorialStep = step;
+  tutorialStepFrames = 0;
+  bannerQueue = [];
+  bannerText = t(key);
+  bannerTimer = 1;
+  announce(bannerText);
+}
+
+function clearLesson() {
+  tutorialStep = '';
+  tutorialStepFrames = 0;
+  bannerQueue = [];
+  bannerText = '';
+  bannerTimer = 0;
+}
+
+function lessonPoint(xRatio, yRatio) {
+  const point = fieldPoint(xRatio, yRatio);
+  if (Math.hypot(point.x - player.x, point.y - player.y) >= 90) return point;
+  return fieldPoint(1 - xRatio, Math.min(0.82, yRatio + 0.34));
+}
+
+function spawnCoinLesson() {
+  showLesson('coins', 'tutorialBannerMove');
+  spawnCoins();
+}
+
+function spawnShieldLesson() {
+  showLesson('shield', 'tutorialBannerShield');
+  const point = lessonPoint(0.22, 0.34);
+  powerups = [{ ...point, type: 'SHIELD' }];
+}
+
+function spawnSackLesson() {
+  showLesson('sack', 'tutorialBannerSack');
+  const point = lessonPoint(0.78, 0.62);
+  powerups = [{ ...point, type: 'COIN' }];
+}
+
+function spawnMissileLesson() {
+  showLesson('missile', 'tutorialBannerMissile');
+  const point = lessonPoint(0.5, 0.32);
+  powerups = [{ ...point, type: 'MISSILE' }];
+}
+
+function spawnMeteorLesson() {
+  showLesson('meteor', 'tutorialBannerMeteor');
+  spawnMeteor(TUTORIAL_METEOR_FRAMES);
+}
+
+function tutorialTravel() {
+  if (currentPath.length < 2) return 0;
+  const start = currentPath[0];
+  const last = currentPath[currentPath.length - 1];
+  return Math.hypot(last.x - start.x, last.y - start.y);
+}
+
+function lessonAllows(type) {
+  if (tutorialStep === 'shield') return type === 'SHIELD';
+  if (tutorialStep === 'sack') return type === 'COIN';
+  if (tutorialStep === 'missile') return type === 'MISSILE';
+  return false;
+}
+
+function advanceTutorialAfterPower(type) {
+  if (!tutorialActive) return;
+  if (type === 'SHIELD' && tutorialStep === 'shield') {
+    clearLesson();
+    spawnSackLesson();
+    return;
+  }
+  if (type === 'COIN' && tutorialStep === 'sack') {
+    clearLesson();
+    spawnCoinLesson();
+    return;
+  }
+  if (type === 'MISSILE' && tutorialStep === 'missile') {
+    clearLesson();
+    spawnMeteorLesson();
+  }
+}
+
 function beginTutorialRound() {
   powerups = [];
   meteor = null;
+  collectibles = [];
   if (currentRound === 1) {
-    queueBanner(t('tutorialBannerMove'), 170);
+    spawnCoinLesson();
   } else if (currentRound === 2) {
-    const shield = fieldPoint(0.22, 0.3);
-    const sack = fieldPoint(0.78, 0.62);
-    powerups.push({ ...shield, type: 'SHIELD' }, { ...sack, type: 'COIN' });
-    queueBanner(t('tutorialBannerEcho'), 160);
-    queueBanner(t('tutorialBannerShield'), 160);
-    queueBanner(t('tutorialBannerSack'), 160);
+    showLesson('echo', 'tutorialBannerEcho');
     grace = Math.max(grace, 170);
   } else if (currentRound === 3) {
-    const shot = fieldPoint(0.5, 0.32);
-    powerups.push({ ...shot, type: 'MISSILE' });
-    queueBanner(t('tutorialBannerMissile'), 160);
-    queueBanner(t('tutorialBannerMeteor'), 200, () => {
-      if (tutorialActive && currentRound === 3) spawnMeteor();
-    });
+    spawnMissileLesson();
     grace = Math.max(grace, 170);
   }
-  spawnCoins();
 }
 
 function burst(x, y, color) {
@@ -1546,7 +1657,8 @@ function resetRun() {
   bannerQueue = [];
   bannerText = '';
   bannerTimer = 0;
-  tutorialReady = false;
+  tutorialStep = '';
+  tutorialStepFrames = 0;
   recordNoted = false;
   recordFlash = 0;
   coinFlashes = [];
@@ -1961,11 +2073,10 @@ function advanceRound() {
     syncHUD();
     return;
   }
-  if (!recordNoted) showBanner(t('roundBanner', { n: currentRound }), 110);
   noteRecord();
   AudioEngine.round();
   spawnCollectibles();
-  announce(bannerText);
+  announce(t('roundBanner', { n: currentRound }));
 }
 
 function applyPowerup(power) {
@@ -2018,7 +2129,7 @@ function detonateMissile(x, y, hit) {
   if (!hit) return;
   const next = dropOldestEcho(echoes);
   echoes = next.echoes;
-  addScore(20);
+  addScore(200);
   AudioEngine.blast();
   buzz('missile');
   showToast(t('echoDestroyed'));
@@ -2078,11 +2189,15 @@ function catchMeteor() {
     burst(ghost.x, ghost.y, '#fff6d8');
   }
   shake = 16;
-  addScore(30);
+  addScore(300);
   AudioEngine.blast();
   buzz('missile');
   showToast(t('meteorCatch'));
   announce(t('meteorCatch'));
+  if (tutorialActive && tutorialStep === 'meteor') {
+    clearLesson();
+    spawnCoinLesson();
+  }
 }
 
 function stepMeteor() {
@@ -2113,10 +2228,14 @@ function stepMeteor() {
       size: 3.2,
     });
   }
-  if (meteor.y > view.h + 36 || meteor.x < -80 || meteor.x > view.w + 80) meteor = null;
+  if (meteor.y > view.h + 36 || meteor.x < -80 || meteor.x > view.w + 80) {
+    meteor = null;
+    if (tutorialActive && tutorialStep === 'meteor') spawnMeteor(TUTORIAL_METEOR_FRAMES);
+  }
 }
 
 function collectCoins() {
+  if (tutorialActive && tutorialStep !== 'coins') return;
   const hit = takeOverlaps(
     collectibles,
     player.x,
@@ -2126,25 +2245,27 @@ function collectCoins() {
   if (!hit.taken.length) return;
 
   collectibles = hit.kept;
-  addScore(10 * hit.taken.length);
+  addScore(100 * hit.taken.length);
   coins += hit.taken.length;
   for (const coin of hit.taken) sparkle(coin.x, coin.y, '#ffbb00');
   AudioEngine.coin();
   if (!tutorialActive) saveAll();
   if (collectibles.length === 0) {
-    if (tutorialActive && (bannerQueue.length > 0 || bannerTimer > 0)) {
-      tutorialReady = true;
-      return;
-    }
+    if (tutorialActive) clearLesson();
     advanceRound();
   }
 }
 
 function collectPowerups() {
-  const hit = takeOverlaps(powerups, player.x, player.y, (power) => player.radius + (power.type === 'COIN' ? 26 : 12));
+  const available = tutorialActive ? powerups.filter((power) => lessonAllows(power.type)) : powerups;
+  const hit = takeOverlaps(available, player.x, player.y, (power) => player.radius + (power.type === 'COIN' ? 26 : 12));
   if (!hit.taken.length) return;
-  powerups = hit.kept;
-  for (const power of hit.taken) applyPowerup(power);
+  const taken = new Set(hit.taken);
+  powerups = powerups.filter((power) => !taken.has(power));
+  for (const power of hit.taken) {
+    applyPowerup(power);
+    advanceTutorialAfterPower(power.type);
+  }
 }
 
 function movePlayer() {
@@ -2228,6 +2349,12 @@ function update() {
   stepMissile();
   tickShield();
   stepParticles();
+
+  if (tutorialActive && tutorialStep) tutorialStepFrames += 1;
+  if (tutorialActive && tutorialStep === 'echo' && tutorialStepFrames > 50 && tutorialTravel() > 70) {
+    clearLesson();
+    spawnShieldLesson();
+  }
 
   const readingLesson = tutorialActive && (bannerTimer > 0 || bannerQueue.length > 0);
   if (!readingLesson && grace <= 0 && hitsEcho(player, echoes, ghostFrame(), FIREBALL_HIT + GHOST_HIT, true)) {
@@ -4761,7 +4888,7 @@ function drawBanner() {
   const lineHeight = 20;
   const height = lines.length * lineHeight + 16;
   const width = Math.min(view.w - 24, Math.max(...lines.map((line) => ctx.measureText(line).width)) + 28);
-  const y = Math.max(92, view.h * 0.16);
+  const y = Math.max(132, view.h * 0.22);
   const x = view.w / 2 - width / 2;
   ctx.fillStyle = 'rgba(8, 10, 16, 0.82)';
   ctx.beginPath();
@@ -5111,7 +5238,7 @@ function bindUI() {
     const dy = event.clientY - previewSwipe.y;
     previewSwipe = null;
     if (Math.abs(dx) < 36 || Math.abs(dx) < Math.abs(dy)) return;
-    const order = ['echo', 'player', 'coins', 'powers'];
+    const order = ['powers', 'echo', 'player', 'coins'];
     const index = Math.max(0, order.indexOf(previewSubject));
     const step = dx > 0 ? 1 : -1;
     setPreviewSubject(order[(index + step + order.length) % order.length]);

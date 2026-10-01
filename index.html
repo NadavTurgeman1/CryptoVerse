@@ -17,28 +17,29 @@
           <button type="button" class="power-btn" id="pause-btn" data-i18n-aria="pauseBtn" aria-label="Pause">
             <span class="pause-mark" aria-hidden="true"></span>
           </button>
-          <button type="button" class="power-btn" id="use-missile" data-i18n-aria="fireMissile" aria-label="Fire stored missile">
-            <canvas class="power-icon" id="missile-icon" width="64" height="64"></canvas>
-            <span class="power-count" id="missile-stock">0</span>
-          </button>
-          <button type="button" class="power-btn" id="use-shield" data-i18n-aria="useShield" aria-label="Turn on stored shield">
-            <canvas class="power-icon" id="shield-icon" width="64" height="64"></canvas>
-            <span class="power-count" id="shield-stock">0</span>
-          </button>
         </div>
         <div class="hud-center">
           <div class="hud-item"><span data-i18n="score">Score</span> <span id="score-val">0</span></div>
-          <div class="hud-sub" id="powerup-status"></div>
         </div>
+        <div class="hud-sub" id="powerup-status"></div>
         <div class="hud-group hud-right">
           <div class="hud-item" id="round-hud"><span data-i18n="round">Round</span> <span id="round-val">1</span></div>
-          <div class="hud-item">$ <span id="coins-val">0</span></div>
+          <div class="hud-item" id="coins-hud">$ <span id="coins-val">0</span></div>
         </div>
+      </div>
+      <div id="ability-bar">
+        <button type="button" class="power-btn" id="use-missile" data-i18n-aria="fireMissile" aria-label="Fire stored missile">
+          <canvas class="power-icon" id="missile-icon" width="64" height="64"></canvas>
+          <span class="power-count" id="missile-stock">0</span>
+        </button>
+        <button type="button" class="power-btn" id="use-shield" data-i18n-aria="useShield" aria-label="Turn on stored shield">
+          <canvas class="power-icon" id="shield-icon" width="64" height="64"></canvas>
+          <span class="power-count" id="shield-stock">0</span>
+        </button>
       </div>
 
       <canvas id="gameCanvas" width="480" height="800" aria-label="Game arena"></canvas>
 
-      <div id="controls-hint" data-i18n="hint">Slide anywhere to move, or use arrows / WASD</div>
       <div id="toast" class="toast hidden" role="status" aria-hidden="true"></div>
       <div id="live" class="sr-only" aria-live="polite"></div>
 
@@ -72,15 +73,14 @@
               <span data-i18n="back">Back</span>
             </button>
             <h1 data-i18n="shop">Shop</h1>
-            <div class="shop-cash">$<span id="wallet-val">0</span></div>
           </div>
           <div class="preview-dock" id="preview-dock">
             <canvas id="loadout-preview" width="240" height="168" aria-label="Preview of the shop items you are trying on"></canvas>
             <div class="preview-switch" role="tablist">
+              <button type="button" class="preview-tab" id="preview-powers" data-i18n="powers">Powers</button>
               <button type="button" class="preview-tab" id="preview-echo" data-i18n="echoes">Echoes</button>
               <button type="button" class="preview-tab" id="preview-player" data-i18n="meteorLook">Fireball</button>
               <button type="button" class="preview-tab" id="preview-coins" data-i18n="coinPacks">Coins</button>
-              <button type="button" class="preview-tab" id="preview-powers" data-i18n="powers">Powers</button>
             </div>
           </div>
         </div>

@@ -553,16 +553,30 @@ export function drawFlag(ctx, x, y, w, h, flag) {
   ctx.restore();
 }
 
-/** Paint the flag across the ghost sheet, keeping the flag's own proportions. */
+function flagAspect(flag) {
+  if (flag.layout === 'israel') return 11 / 8;
+  if (flag.id === 'ch' || flag.id === 'va') return 1;
+  return 3 / 2;
+}
+
+/** Color along the lower edge, used only where the sheet hangs below the flag. */
+function flagHemColor(flag) {
+  if (flag.layout === 'israel') return '#ffffff';
+  if (flag.layout === 'v') return flag.colors[Math.floor((flag.colors.length - 1) / 2)] || flag.colors[0];
+  return flag.colors.at(-1) || flag.colors[0];
+}
+
+/** Zoom the flag onto the ghost. Same scale on both axes, set a little toward the torso. */
 export function paintGhostFlag(ctx, radius, flag) {
   if (!flag) return;
-  const aspect = flag.layout === 'israel' ? 11 / 8 : 3 / 2;
-  let w = radius * 2.2;
-  let h = w / aspect;
-  const maxH = radius * 2.55;
-  if (h > maxH) {
-    h = maxH;
-    w = h * aspect;
-  }
-  drawFlag(ctx, -w / 2, -h * 0.58, w, h, flag);
+  const zoom = 1.26;
+  const width0 = radius * 2.24;
+  const height0 = width0 / flagAspect(flag);
+  const width = width0 * zoom;
+  const height = height0 * zoom;
+  const left = -width / 2;
+  const top = -radius * 1.2 - (height - height0) / 2;
+  ctx.fillStyle = flagHemColor(flag);
+  ctx.fillRect(-radius * 1.2, -radius * 1.5, radius * 2.4, radius * 3.1);
+  drawFlag(ctx, left, top, width, height, flag);
 }

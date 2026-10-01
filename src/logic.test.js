@@ -308,17 +308,21 @@ test('spawns stay away from the player when the field has room', () => {
   assert.ok(Math.hypot(point.x - 10, point.y - 10) >= 90);
 });
 
-test('missiles are the rare field power and meteors stay near one in thirty', () => {
+test('missiles are the rare field power and meteors stay near one in fifty', () => {
   let missiles = 0;
+  let shields = 0;
   for (let i = 0; i < 1100; i += 1) {
-    if (pickPowerType(() => (i % 11) / 11) === 'MISSILE') missiles += 1;
+    const type = pickPowerType(() => (i % 11) / 11);
+    if (type === 'MISSILE') missiles += 1;
+    if (type === 'SHIELD') shields += 1;
   }
-  assert.ok(missiles < 200);
+  assert.ok(missiles > 100);
+  assert.ok(missiles < shields);
   for (let i = 0; i < 20; i += 1) {
     assert.notEqual(pickPowerType(() => i / 20, false), 'MISSILE');
   }
-  assert.equal(shouldSpawnMeteor(() => 0.02), true);
-  assert.equal(shouldSpawnMeteor(() => 0.2), false);
+  assert.equal(shouldSpawnMeteor(() => 0.01), true);
+  assert.equal(shouldSpawnMeteor(() => 0.03), false);
   const ends = pickMeteorEnds(() => 0.1, 400);
   assert.ok(Math.abs(ends.endX - ends.startX) >= 400 * 0.38);
   const velocity = meteorVelocity(ends.startX, ends.endX, 800, 24);

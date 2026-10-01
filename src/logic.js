@@ -328,11 +328,11 @@ export function applyCosmetic(loadout, item) {
   };
 }
 
-/** Shield and the sack stay common. The missile is the rare one of the three. */
+/** Shield and the sack stay common. A missile is a bit more common than it used to be, and still rarer than both. */
 const POWER_WEIGHTS = [
   ['SHIELD', 5],
   ['COIN', 5],
-  ['MISSILE', 1],
+  ['MISSILE', 2.5],
 ];
 
 export function pickPowerType(rand, allowMissile = true) {
@@ -348,9 +348,9 @@ export function pickPowerType(rand, allowMissile = true) {
   return 'SHIELD';
 }
 
-/** About one meteor every thirty rounds, decided independently each round. */
+/** About one meteor every fifty rounds, decided independently each round. */
 export function shouldSpawnMeteor(rand) {
-  return rand() < 1 / 30;
+  return rand() < 1 / 50;
 }
 
 /** A fast diagonal from the top. The ends stay far enough apart that it is never a vertical drop. */

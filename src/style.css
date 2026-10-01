@@ -101,8 +101,9 @@ body {
     height: 42px;
   }
 
-  #controls-hint {
-    font-size: 0.72rem;
+  #ability-bar .power-btn {
+    width: 52px;
+    height: 52px;
   }
 
   .how-to {
@@ -231,7 +232,7 @@ body {
 
 .shop-bar {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 8px;
   width: 100%;
@@ -239,21 +240,22 @@ body {
 
 .shop-bar h1 {
   margin: 0;
+  grid-column: 2;
+  justify-self: center;
   text-align: center;
   font-size: 1.35rem;
 }
 
 .shop-bar .back-btn {
   position: static;
+  grid-column: 1;
+  justify-self: start;
+  height: 46px;
+  min-height: 46px;
   margin: 0;
-}
-
-.shop-cash {
-  min-width: 72px;
-  text-align: end;
-  font-size: 1.15rem;
-  font-weight: 800;
-  color: var(--gold);
+  padding: 0 16px 0 12px;
+  border-radius: 16px;
+  font-size: 1.05rem;
 }
 
 .preview-dock {
@@ -416,13 +418,11 @@ body {
 #game-container[data-lang="he"] .subtitle,
 #game-container[data-lang="he"] .best,
 #game-container[data-lang="he"] .toast,
-#game-container[data-lang="he"] #controls-hint,
 #game-container[data-lang="he"] h1:not(.logo),
 #game-container[data-lang="ar"] .panel-box,
 #game-container[data-lang="ar"] .subtitle,
 #game-container[data-lang="ar"] .best,
 #game-container[data-lang="ar"] .toast,
-#game-container[data-lang="ar"] #controls-hint,
 #game-container[data-lang="ar"] h1:not(.logo) {
   direction: rtl;
 }
@@ -518,7 +518,7 @@ h1 {
   width: 100%;
   padding: max(10px, env(safe-area-inset-top)) 10px 0;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
   gap: 8px;
   z-index: 12;
@@ -527,8 +527,27 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
+@media (max-width: 430px) {
+  #hud {
+    padding-right: 8px;
+    padding-left: 8px;
+    gap: 6px;
+  }
+
+  .hud-group,
+  .hud-center {
+    padding: 0 8px;
+    gap: 6px;
+  }
+
+  .hud-item {
+    gap: 4px;
+  }
+}
+
 #game-container:not([data-state="PLAYING"]) .hud-center,
-#game-container:not([data-state="PLAYING"]) #round-hud {
+#game-container:not([data-state="PLAYING"]) #round-hud,
+#game-container[data-state="PLAYING"] #coins-hud {
   display: none;
 }
 
@@ -545,12 +564,17 @@ h1 {
 }
 
 .hud-center {
-  grid-column: 2;
-  justify-self: center;
+  position: absolute;
+  left: 50%;
+  top: max(10px, env(safe-area-inset-top));
+  transform: translateX(-50%);
+  grid-column: auto;
+  grid-row: auto;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0;
+  z-index: 1;
 }
 
 .hud-right {
@@ -567,6 +591,23 @@ h1 {
 
 .hud-sub:empty {
   display: none;
+}
+
+#powerup-status {
+  position: absolute;
+  left: 50%;
+  top: calc(max(10px, env(safe-area-inset-top)) + 58px);
+  transform: translateX(-50%);
+  z-index: 12;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  min-height: 0;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .hud-item {
@@ -898,6 +939,19 @@ h1 {
   width: 100%;
 }
 
+.flag-more {
+  grid-column: 1 / -1;
+  appearance: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--text-main);
+  background: rgba(240, 193, 75, 0.12);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
 .shop-name {
   font-size: 0.72rem;
   line-height: 1.25;
@@ -916,10 +970,34 @@ h1 {
   display: none;
   flex-direction: row;
   gap: 8px;
+  margin-inline-start: 20px;
   pointer-events: auto;
 }
 
-#game-container[data-state="PLAYING"] #power-bar {
+#ability-bar {
+  position: absolute;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 12;
+  display: none;
+  flex-direction: row;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+#ability-bar .power-btn {
+  width: 58px;
+  height: 58px;
+}
+
+#ability-bar .power-icon {
+  width: 48px;
+  height: 48px;
+}
+
+#game-container[data-state="PLAYING"] #power-bar,
+#game-container[data-state="PLAYING"] #ability-bar {
   display: flex;
 }
 
@@ -1123,27 +1201,9 @@ h1 {
   box-shadow: none;
 }
 
-#controls-hint {
-  position: absolute;
-  bottom: max(16px, env(safe-area-inset-bottom));
-  left: 16px;
-  right: 16px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 0.82rem;
-  line-height: 1.4;
-  pointer-events: none;
-  opacity: 0;
-  z-index: 5;
-}
-
-#game-container[data-state="PLAYING"] #controls-hint {
-  opacity: 0.8;
-}
-
 .toast {
   position: absolute;
-  bottom: 72px;
+  bottom: calc(92px + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   z-index: 8;
