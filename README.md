@@ -13,6 +13,16 @@ npm run dev
 
 Open http://127.0.0.1:47321
 
+### On a phone on the same Wi-Fi
+
+```bash
+npm run dev -- --host
+```
+
+The terminal prints a Network URL such as `http://192.168.1.20:47321`. Open that address in Safari on the iPhone, or in Chrome on Android. The computer and the phone have to be on the same network. Add it to the Home Screen if you want it to open like an app while you test.
+
+Phones use the full screen, including tall iPhones and landscape. iPads and tablets get a larger centered stage, and the shop uses four columns there.
+
 ```bash
 npm test
 npm run build

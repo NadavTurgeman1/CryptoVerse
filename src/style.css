@@ -45,19 +45,64 @@ body {
 #game-container {
   position: relative;
   width: 100%;
-  max-width: 480px;
   height: 100dvh;
-  max-height: 850px;
   background: radial-gradient(circle at center, #0c1018 0%, #03040a 100%);
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
   overflow: hidden;
 }
 
-@media (min-width: 520px) {
+@media (min-width: 768px) and (min-height: 700px) {
   #game-container {
-    height: min(850px, calc(100dvh - 32px));
-    border-radius: 28px;
+    width: min(760px, 92vw);
+    height: calc(100dvh - 48px);
+    border-radius: 32px;
     border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  h1 {
+    font-size: 3.2rem;
+  }
+
+  .btn {
+    max-width: 320px;
+    font-size: 1.12rem;
+  }
+}
+
+@media (max-height: 520px) {
+  #game-container {
+    width: 100%;
+    height: 100dvh;
+    border-radius: 0;
+    border: none;
+  }
+
+  h1 {
+    font-size: 1.85rem;
+    margin-bottom: 4px;
+  }
+
+  #menu-best {
+    font-size: 1.05rem;
+    margin-bottom: 8px;
+  }
+
+  .btn {
+    padding: 10px 20px;
+    margin: 4px;
+  }
+
+  .hud-item {
+    font-size: 0.92rem;
+  }
+
+  .power-btn {
+    width: 42px;
+    height: 42px;
+  }
+
+  #controls-hint {
+    font-size: 0.72rem;
   }
 }
 
@@ -688,6 +733,7 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 12px 0;
   color: var(--text-main);
@@ -754,7 +800,8 @@ h1 {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 10px 42px 10px 16px;
-  min-width: 204px;
+  min-width: min(204px, 100%);
+  max-width: 100%;
   min-height: 44px;
   font: inherit;
   font-weight: 700;
@@ -831,6 +878,16 @@ h1 {
 
 .toast.hidden {
   opacity: 0;
+}
+
+@media (min-width: 768px) and (min-height: 700px) {
+  .panel-box {
+    max-width: 680px;
+  }
+
+  .shop-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .sr-only {
