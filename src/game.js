@@ -1631,35 +1631,71 @@ function trailStrength(point) {
   return 1 - fade;
 }
 
+function drawTaper(points, widthAt, rgb, alpha) {
+  const lens = [0];
+  for (let i = 1; i < points.length; i += 1) {
+    const span = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+    lens.push(lens[i - 1] + span);
+  }
+  const total = lens[lens.length - 1];
+  if (total < 1) return;
+  const dirs = [];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const span = lens[i + 1] - lens[i] || 1;
+    dirs.push({
+      x: (points[i + 1].x - points[i].x) / span,
+      y: (points[i + 1].y - points[i].y) / span,
+    });
+  }
+  const left = [];
+  const right = [];
+  for (let i = 0; i < points.length; i += 1) {
+    const half = widthAt(lens[i] / total) / 2;
+    const incoming = dirs[Math.max(0, i - 1)];
+    const outgoing = dirs[Math.min(dirs.length - 1, i)];
+    const nx = -incoming.y - outgoing.y;
+    const ny = incoming.x + outgoing.x;
+    const nlen = Math.hypot(nx, ny) || 1;
+    const mx = nx / nlen;
+    const my = ny / nlen;
+    const denom = mx * -outgoing.y + my * outgoing.x;
+    if (denom < 0.45) {
+      const ax = -incoming.y;
+      const ay = incoming.x;
+      const bx = -outgoing.y;
+      const by = outgoing.x;
+      left.push({ x: points[i].x + ax * half, y: points[i].y + ay * half });
+      left.push({ x: points[i].x + bx * half, y: points[i].y + by * half });
+      right.push({ x: points[i].x - ax * half, y: points[i].y - ay * half });
+      right.push({ x: points[i].x - bx * half, y: points[i].y - by * half });
+    } else {
+      const scale = Math.min(1.8, 1 / denom);
+      left.push({ x: points[i].x + mx * half * scale, y: points[i].y + my * half * scale });
+      right.push({ x: points[i].x - mx * half * scale, y: points[i].y - my * half * scale });
+    }
+  }
+  ctx.beginPath();
+  ctx.moveTo(left[0].x, left[0].y);
+  for (let i = 1; i < left.length; i += 1) ctx.lineTo(left[i].x, left[i].y);
+  for (let i = right.length - 1; i >= 0; i -= 1) ctx.lineTo(right[i].x, right[i].y);
+  ctx.closePath();
+  ctx.fillStyle = `rgba(${rgb}, ${alpha})`;
+  ctx.fill();
+}
+
 function drawFireTrail(points) {
   let first = 0;
   while (first < points.length - 1 && trailStrength(points[first]) <= 0) first += 1;
-  const visible = points.slice(first);
-  const ribbon = resamplePath(visible, 8);
+  const ribbon = resamplePath(points.slice(first), 6);
   if (ribbon.length < 2) return;
-  const cut = ribbon.findIndex((point) => trailStrength(point) >= 0.92);
-  const tail = cut > 0 ? ribbon.slice(0, cut + 1) : null;
-  const body = cut > 0 ? ribbon.slice(cut) : ribbon;
   ctx.save();
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
   const layers = [
-    [15, '255, 48, 0', 0.26],
-    [6.5, '255, 122, 16', 0.8],
-    [2.2, '255, 236, 176', 0.92],
+    [7, 28, '255, 48, 0', 0.22],
+    [2.8, 12, '255, 122, 16', 0.74],
+    [1, 4.2, '255, 244, 210', 0.9],
   ];
-  for (const [width, rgb, peak] of layers) {
-    ctx.lineWidth = width;
-    if (tail && tail.length >= 2) {
-      traceRibbon(tail);
-      ctx.strokeStyle = `rgba(${rgb}, ${peak * 0.28})`;
-      ctx.stroke();
-    }
-    if (body.length >= 2) {
-      traceRibbon(body);
-      ctx.strokeStyle = `rgba(${rgb}, ${peak})`;
-      ctx.stroke();
-    }
+  for (const [thin, thick, rgb, alpha] of layers) {
+    drawTaper(ribbon, (t) => thin + (thick - thin) * t, rgb, alpha);
   }
   ctx.restore();
 }

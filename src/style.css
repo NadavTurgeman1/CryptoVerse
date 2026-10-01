@@ -328,6 +328,12 @@ h1 {
   line-height: 1.5;
 }
 
+#final-stats {
+  font-size: 1.22rem;
+  font-weight: 700;
+  color: #f4f7ff;
+}
+
 .best {
   color: var(--gold);
   font-weight: 700;
@@ -397,6 +403,11 @@ h1 {
 #game-container[data-state="PLAYING"] #hud,
 #game-container[data-state="GAMEOVER"] #hud {
   opacity: 1;
+}
+
+#game-container[data-state="GAMEOVER"] .hud-center,
+#game-container[data-state="GAMEOVER"] #round-hud {
+  display: none;
 }
 
 .hud-group,
