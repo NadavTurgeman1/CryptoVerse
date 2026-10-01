@@ -16,6 +16,8 @@ test('language stays English unless the browser prefers a language we ship', () 
   assert.equal(languageOffer(['es', 'en'], null), 'es');
   assert.equal(languageOffer(['de-DE'], null), 'de');
   assert.equal(languageOffer(['ar-SA', 'en'], null), 'ar');
+  assert.equal(languageOffer(['ru-RU', 'en'], null), 'ru');
+  assert.equal(languageOffer(['zh-CN', 'en'], null), 'zh');
   assert.equal(languageOffer(['fr', 'de'], null), 'fr');
   assert.equal(languageOffer(['he'], 'en'), null);
   assert.equal(languageOffer(['de'], 'fr'), null);
@@ -28,7 +30,7 @@ test('language stays English unless the browser prefers a language we ship', () 
 
 test('pause and how-to lines exist in every language', () => {
   for (const lang of UI_LANGS) {
-    for (const key of ['howTo', 'paused', 'resume', 'pauseBtn', 'tutorial', 'gotIt', 'tutorialMove', 'tutorialCoins', 'tutorialMissile', 'tutorialShield', 'sfx']) {
+    for (const key of ['howTo', 'paused', 'resume', 'pauseBtn', 'tutorial', 'gotIt', 'tutorialMove', 'tutorialCoins', 'tutorialMissile', 'tutorialShield', 'tutorialBannerMove', 'tutorialBannerEcho', 'tutorialBannerShield', 'tutorialBannerSack', 'tutorialBannerMissile', 'tutorialBannerMeteor', 'tutorialDone', 'meteorCatch', 'sfx']) {
       const value = STRINGS[lang][key];
       assert.equal(typeof value, 'string', `${lang}.${key}`);
       assert.equal(value.length > 0, true, `${lang}.${key}`);
@@ -46,6 +48,8 @@ test('every shop item has its own name in every language', () => {
     'propeller', 'sombrero', 'headphones', 'banana', 'bag', 'imperial', 'rounds', 'shades', 'visor',
     'shadeRed', 'shadeBlue', 'shadeGold', 'shadeGreen', 'shadePink', 'shadeViolet', 'shadeWhite',
     'shadeAmber', 'patch', 'monocle', 'stereo', 'hearts', 'stars', 'goggles', 'aviator', 'nerd', 'mustache',
+    'laurel', 'packGold', 'packCrypto', 'packBenjamin', 'packDiamond', 'packRuby', 'packEmerald', 'packHolo', 'packPixel', 'packNova', 'meteorClassic', 'meteorGold', 'meteorIce', 'meteorVoid', 'meteorToxic', 'meteorPrism',
+    'meteorShift', 'meteorAurora', 'trailClassic', 'trailGold', 'trailIce', 'trailPrism', 'trailShift',
   ];
   for (const lang of UI_LANGS) {
     for (const key of keys) {
@@ -60,4 +64,17 @@ test('every shop item has its own name in every language', () => {
   assert.equal(translate('de', 'viking'), 'Wikinger');
   assert.equal(translate('ar', 'astro'), 'رائد فضاء');
   assert.equal(translate('he', 'prism'), 'מתחלף');
+  assert.equal(translate('ru', 'play'), 'Играть');
+  assert.equal(translate('zh', 'shop'), '商店');
+});
+
+test('every language has the same strings as english', () => {
+  const english = Object.keys(STRINGS.en);
+  for (const lang of UI_LANGS) {
+    const keys = Object.keys(STRINGS[lang]);
+    assert.deepEqual(keys, english, lang);
+    for (const key of english) {
+      assert.equal(STRINGS[lang][key].length > 0, true, `${lang}.${key}`);
+    }
+  }
 });

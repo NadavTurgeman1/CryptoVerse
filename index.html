@@ -66,22 +66,34 @@
 
       <div id="shop-screen" class="screen hidden">
         <div class="shop-top">
-          <button type="button" class="back-btn" id="close-shop" data-i18n-aria="back" aria-label="Back">
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5 L8 12 L15 19" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-            <span data-i18n="back">Back</span>
-          </button>
-          <div class="preview-dock">
-            <canvas id="loadout-preview" width="240" height="168" aria-label="Echo preview of the shop items you are trying on"></canvas>
-            <p id="try-on-caption" class="try-caption" data-i18n="tryHint">Tap an item to preview it on an echo</p>
+          <div class="shop-bar">
+            <button type="button" class="back-btn" id="close-shop" data-i18n-aria="back" aria-label="Back">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5 L8 12 L15 19" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <span data-i18n="back">Back</span>
+            </button>
+            <h1 data-i18n="shop">Shop</h1>
+            <div class="shop-cash">$<span id="wallet-val">0</span></div>
+          </div>
+          <div class="preview-dock" id="preview-dock">
+            <canvas id="loadout-preview" width="240" height="168" aria-label="Preview of the shop items you are trying on"></canvas>
+            <div class="preview-switch" role="tablist">
+              <button type="button" class="preview-tab" id="preview-echo" data-i18n="echoes">Echoes</button>
+              <button type="button" class="preview-tab" id="preview-player" data-i18n="meteorLook">Fireball</button>
+              <button type="button" class="preview-tab" id="preview-coins" data-i18n="coinPacks">Coins</button>
+              <button type="button" class="preview-tab" id="preview-powers" data-i18n="powers">Powers</button>
+            </div>
           </div>
         </div>
         <div class="shop-scroll">
-        <h1 data-i18n="shop">Shop</h1>
-        <p class="subtitle"><span data-i18n="balance">Balance</span>: $<span id="wallet-val">0</span></p>
+        <details class="deal-fold" id="deal-fold" open>
+          <summary data-i18n="dailyDeals">Daily deals</summary>
+          <div class="shop-grid" id="deal-shop"></div>
+        </details>
+        <div id="echo-shop">
         <div class="panel-box">
-          <div class="panel-title" data-i18n="powers">Powers</div>
-          <p class="try-caption" data-i18n="powersHint">Buy these before a run, then use them any time during play. There is no stock cap.</p>
-          <div id="power-shop"></div>
+          <div class="panel-title" data-i18n="flags">Flags</div>
+          <input id="echo-flag-search" class="flag-search" type="search" autocomplete="off" />
+          <div class="shop-grid" id="echo-flag-shop"></div>
         </div>
         <div class="panel-box">
           <div class="panel-title" data-i18n="colors">Colors</div>
@@ -96,7 +108,38 @@
           <div class="shop-grid" id="glasses-shop"></div>
         </div>
         </div>
-        <button type="button" class="btn try-buy" id="try-on-buy" hidden>Buy</button>
+        <div id="player-shop" hidden>
+        <div class="panel-box">
+          <div class="panel-title" data-i18n="flags">Flags</div>
+          <input id="player-flag-search" class="flag-search" type="search" autocomplete="off" />
+          <div class="shop-grid" id="player-flag-shop"></div>
+        </div>
+        <div class="panel-box">
+          <div class="panel-title" data-i18n="meteorColors">Fireball</div>
+          <div class="shop-grid" id="player-shop-grid"></div>
+        </div>
+        <div class="panel-box">
+          <div class="panel-title" data-i18n="trailColors">Trail</div>
+          <div class="shop-grid" id="trail-shop"></div>
+        </div>
+        </div>
+        <div id="coin-shop-panel" hidden>
+          <div class="panel-box">
+            <div class="panel-title" data-i18n="coinPacks">Coins</div>
+            <div class="shop-grid" id="coin-shop"></div>
+          </div>
+        </div>
+        <div id="power-shop-panel" hidden>
+          <div class="panel-box">
+            <div class="panel-title" data-i18n="powers">Powers</div>
+            <div id="power-shop"></div>
+          </div>
+        </div>
+        </div>
+        <div class="try-actions">
+          <button type="button" class="btn try-buy" id="try-on-buy" hidden>Buy</button>
+          <button type="button" class="btn btn-secondary try-ad" id="try-on-ad" hidden>Ad</button>
+        </div>
       </div>
 
       <div id="settings-screen" class="screen hidden">
@@ -123,6 +166,8 @@
               <option value="de">🇩🇪 Deutsch</option>
               <option value="he">🇮🇱 עברית</option>
               <option value="ar">🇸🇦 العربية</option>
+            <option value="ru">🇷🇺 Русский</option>
+            <option value="zh">🇨🇳 中文</option>
             </select>
           </label>
         </div>
@@ -146,11 +191,42 @@
         <button type="button" class="btn btn-secondary" id="pause-menu-btn" data-i18n="mainMenu">Main menu</button>
       </div>
 
+      <div id="flag-screen" class="screen hidden">
+        <button type="button" class="back-btn" id="close-flags" data-i18n-aria="back" aria-label="Back">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 5 L8 12 L15 19" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          <span data-i18n="back">Back</span>
+        </button>
+        <h1 id="flag-title" data-i18n="flags">Flags</h1>
+        <canvas id="flag-preview" width="240" height="140" aria-hidden="true"></canvas>
+        <input id="flag-search" class="flag-search" type="search" autocomplete="off" />
+        <div id="flag-list" class="flag-list"></div>
+        <button type="button" class="btn try-buy" id="flag-buy" hidden>Buy</button>
+      </div>
+
+      <div id="ad-overlay" class="overlay hidden" inert>
+        <div class="overlay-card">
+          <h2 id="ad-title">A short sponsor</h2>
+          <p id="ad-wait" class="subtitle">Reward in 6</p>
+          <button type="button" class="btn" id="ad-claim" disabled>Claim</button>
+          <button type="button" class="btn btn-secondary" id="ad-skip">Not now</button>
+        </div>
+      </div>
+
+      <div id="rate-overlay" class="overlay hidden" inert>
+        <div class="overlay-card">
+          <h2 id="rate-title">Rate CryptoVerse</h2>
+          <p id="rate-body" class="subtitle"></p>
+          <button type="button" class="btn" id="rate-go">Rate now</button>
+          <button type="button" class="btn btn-secondary" id="rate-later">Not now</button>
+        </div>
+      </div>
+
       <div id="game-over-screen" class="screen hidden">
         <h1 data-i18n="youLost">You lost</h1>
         <p class="record-banner" id="record-banner" hidden>New record!</p>
         <p class="subtitle" id="final-stats">Round 1 · 0 pts</p>
         <p class="best" id="final-best"></p>
+        <button type="button" class="btn" id="continue-btn" data-i18n="continueAd">Continue · watch ad</button>
         <button type="button" class="btn" id="retry-btn" data-i18n="playAgain">Play again</button>
         <button type="button" class="btn btn-secondary" id="menu-btn" data-i18n="mainMenu">Main menu</button>
       </div>

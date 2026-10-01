@@ -34,33 +34,79 @@ export function sanitizeUnlocks(list, catalogIds) {
   return cleaned;
 }
 
-export function ghostPoint(echo, frame) {
+/** Pixels traveled each frame when playback is 100. Round pressure scales this. */
+export const GHOST_SPEED = 6;
+
+const routeCount = new WeakMap();
+
+function tagRoutes(echo, count) {
+  routeCount.set(echo, count);
+  return echo;
+}
+
+/**
+ * Walk the sealed route at a steady pace.
+ * One route restarts at the first point. Two routes also travel back to that start.
+ * Extra samples from standing still add no distance.
+ */
+export function ghostPoint(echo, frame, speed = GHOST_SPEED) {
   if (!echo?.length) return null;
-  const index = ((frame % echo.length) + echo.length) % echo.length;
-  return echo[index];
+  const home = { x: echo[0].x, y: echo[0].y };
+  if (echo.length === 1) return home;
+
+  const spans = [];
+  let total = 0;
+  const push = (from, to) => {
+    const length = Math.hypot(to.x - from.x, to.y - from.y);
+    spans.push({ from, to, length });
+    total += length;
+  };
+  for (let i = 1; i < echo.length; i += 1) push(echo[i - 1], echo[i]);
+  if (routeCount.get(echo) === 2) push(echo[echo.length - 1], echo[0]);
+  if (!(total > 0)) return home;
+
+  const ticks = Number(frame);
+  const pace = Number(speed);
+  const travel = (Number.isFinite(ticks) ? ticks : 0) * (Number.isFinite(pace) && pace > 0 ? pace : GHOST_SPEED);
+  let distance = ((travel % total) + total) % total;
+  for (const span of spans) {
+    if (!(span.length > 0)) continue;
+    if (distance <= span.length) {
+      const t = distance / span.length;
+      return {
+        x: span.from.x + (span.to.x - span.from.x) * t,
+        y: span.from.y + (span.to.y - span.from.y) * t,
+      };
+    }
+    distance -= span.length;
+  }
+  return home;
 }
 
 /**
  * Later rounds tighten the route you just drew, a little at a time.
- * Playback is a percent of the recorded speed, grace is frames of safety,
- * spacing is how far apart coins stay, and reach pulls them toward the first coin.
- * The hard floors land around round 20, so round 12 is still a climb.
+ * Playback climbs slowly. A round that only extends a ghost speeds them up,
+ * and a round that adds a ghost slows them a little, without breaking the climb.
+ * Grace is frames of safety, spacing is how far apart coins stay,
+ * and reach pulls them toward the first coin.
  */
 export function roundPressure(round) {
   const steps = Math.max(0, Math.floor(Number(round)) - 1);
   const safeSteps = Number.isFinite(steps) ? steps : 0;
+  const wave = safeSteps % 2 === 1 ? -3 : 0;
   return {
-    playback: Math.min(160, 100 + safeSteps * 4),
+    playback: Math.min(160, Math.max(90, 100 + safeSteps * 2 + wave)),
     grace: Math.max(40, 75 - safeSteps * 2),
     spacing: Math.max(56, 78 - safeSteps),
     reach: safeSteps === 0 ? Infinity : Math.max(170, 320 - safeSteps * 8),
   };
 }
 
-/** Path index for every echo. Round 1 stays on the recorded clock. */
+/** Travel time along a route. Playback 100 keeps the base speed, and later rounds scale it. */
 export function echoClock(frame, round) {
-  const ticks = Math.max(0, Math.floor(Number(frame)) || 0);
-  return Math.floor((ticks * roundPressure(round).playback) / 100);
+  const ticks = Number(frame);
+  const safe = Number.isFinite(ticks) ? Math.max(0, ticks) : 0;
+  return (safe * roundPressure(round).playback) / 100;
 }
 
 /** The first sealed route is the oldest echo. Later routes stay in order. */
@@ -102,11 +148,25 @@ export function hitsEcho(player, echoes, frame, hitDist, vulnerable) {
   return false;
 }
 
-/** Copy the finished route into the echo list. Later edits to `path` must not rewrite history. */
+/**
+ * Keep the finished route. Odd rounds add a ghost with that one path.
+ * Even rounds extend the newest ghost, so it walks the first path,
+ * then the second, then back to the start. Later edits to `path` must not rewrite history.
+ */
 export function sealPath(echoes, path, round) {
-  const sealed = path.map((point) => ({ x: point.x, y: point.y }));
+  const sealed = tagRoutes(path.map((point) => ({ x: point.x, y: point.y })), 1);
+  const next = echoes.map((echo) => tagRoutes(
+    echo.map((point) => ({ x: point.x, y: point.y })),
+    routeCount.get(echo) === 2 ? 2 : 1,
+  ));
+  const finished = Math.max(1, Math.floor(Number(round)) || 1);
+  if (finished % 2 === 1 || next.length === 0) next.push(sealed);
+  else {
+    const last = next[next.length - 1];
+    next[next.length - 1] = tagRoutes([...last, ...sealed], 2);
+  }
   return {
-    echoes: [...echoes, sealed],
+    echoes: next,
     round: round + 1,
     frame: 0,
   };
@@ -185,6 +245,18 @@ export function spendCharge(stock) {
   return { stock: owned - 1, status: 'spent' };
 }
 
+/** Coin price, rewarded ads, both, a store rating, or already free. */
+export function itemOffer(item) {
+  if (item?.offer === 'rate') return { kind: 'rate', ads: 0, price: 0 };
+  const price = Math.max(0, Math.floor(Number(item?.price)) || 0);
+  const listedAds = Math.floor(Number(item?.ads)) || 0;
+  const ads = item?.offer === 'ad' ? Math.max(1, listedAds) : Math.max(0, listedAds);
+  if (price > 0 && ads > 0) return { kind: 'either', ads, price };
+  if (ads > 0) return { kind: 'ad', ads, price: 0 };
+  if (price <= 0) return { kind: 'free', ads: 0, price: 0 };
+  return { kind: 'coin', ads: 0, price };
+}
+
 export function resolvePurchase(state, item) {
   if (state.unlocked.includes(item.id)) {
     return {
@@ -253,5 +325,51 @@ export function applyCosmetic(loadout, item) {
     unlocked: { ...loadout.unlocked, [item.slot]: result.unlocked },
     active: { ...loadout.active, [item.slot]: result.active },
     status: result.status,
+  };
+}
+
+/** Shield and the sack stay common. The missile is the rare one of the three. */
+const POWER_WEIGHTS = [
+  ['SHIELD', 5],
+  ['COIN', 5],
+  ['MISSILE', 1],
+];
+
+export function pickPowerType(rand, allowMissile = true) {
+  const table = allowMissile
+    ? POWER_WEIGHTS
+    : POWER_WEIGHTS.filter(([type]) => type !== 'MISSILE');
+  const total = table.reduce((sum, [, weight]) => sum + weight, 0);
+  let roll = rand() * total;
+  for (const [type, weight] of table) {
+    roll -= weight;
+    if (roll < 0) return type;
+  }
+  return 'SHIELD';
+}
+
+/** About one meteor every thirty rounds, decided independently each round. */
+export function shouldSpawnMeteor(rand) {
+  return rand() < 1 / 30;
+}
+
+/** A fast diagonal from the top. The ends stay far enough apart that it is never a vertical drop. */
+export function pickMeteorEnds(rand, width) {
+  const span = Math.max(1, width);
+  const startX = span * (0.08 + rand() * 0.84);
+  let endX = span * (0.08 + rand() * 0.84);
+  const minSpan = span * 0.38;
+  if (Math.abs(endX - startX) < minSpan) {
+    const dir = endX >= startX ? 1 : -1;
+    endX = clamp(startX + dir * minSpan, span * 0.05, span * 0.95);
+  }
+  return { startX, endX };
+}
+
+export function meteorVelocity(startX, endX, height, frames) {
+  const travel = Math.max(8, frames);
+  return {
+    vx: (endX - startX) / travel,
+    vy: Math.max(1, height) / travel,
   };
 }

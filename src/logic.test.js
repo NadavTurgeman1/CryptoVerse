@@ -4,8 +4,13 @@ import {
   applyCosmetic,
   buyCharge,
   dropOldestEcho,
+  meteorVelocity,
+  pickMeteorEnds,
+  pickPowerType,
+  shouldSpawnMeteor,
   spendCharge,
   echoClock,
+  GHOST_SPEED,
   ghostPoint,
   hitsEcho,
   roundPressure,
@@ -19,7 +24,9 @@ import {
   sanitizeUnlocks,
   sealPath,
   takeOverlaps,
+  itemOffer,
 } from './logic.js';
+import { FLAGS, flagById, flagTrail, countryName } from './flags.js';
 
 test('corrupt color saves fall back instead of throwing', () => {
   assert.deepEqual(safeJson('{', ['#00f0ff']), ['#00f0ff']);
@@ -49,9 +56,72 @@ test('a sealed echo is a snapshot, and the ghost loops with the round clock', ()
   assert.equal(sealed.round, 2);
   assert.equal(sealed.frame, 0);
   assert.deepEqual(sealed.echoes[0], [{ x: 1, y: 2 }, { x: 3, y: 4 }]);
+  assert.equal(sealed.echoes.length, 1);
   assert.deepEqual(ghostPoint(sealed.echoes[0], 0), { x: 1, y: 2 });
-  assert.deepEqual(ghostPoint(sealed.echoes[0], 3), { x: 3, y: 4 });
   assert.equal(ghostPoint([], 0), null);
+});
+
+test('a ghost keeps one pace along the route and skips the time spent standing still', () => {
+  const direct = [{ x: 0, y: 0 }, { x: 30, y: 0 }];
+  const paused = [
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+    { x: 30, y: 0 },
+  ];
+  assert.deepEqual(ghostPoint(paused, 10, 1), { x: 10, y: 0 });
+  assert.deepEqual(ghostPoint(direct, 10, 1), ghostPoint(paused, 10, 1));
+  assert.deepEqual(ghostPoint(direct, 40, 1), { x: 10, y: 0 });
+  assert.deepEqual(ghostPoint([{ x: 4, y: 7 }], 12), { x: 4, y: 7 });
+
+  const route = [{ x: 0, y: 0 }, { x: 500, y: 0 }];
+  const traveled = (round) => ghostPoint(route, echoClock(20, round)).x;
+  assert.ok(Math.abs(traveled(1) - 20 * GHOST_SPEED) < 1e-6);
+  assert.ok(traveled(3) > traveled(4));
+  assert.ok(traveled(4) > traveled(2));
+  assert.ok(traveled(5) > traveled(3));
+});
+
+test('ghosts arrive every other round and the newest one grows to two paths', () => {
+  const first = [{ x: 1, y: 1 }];
+  const second = [{ x: 2, y: 2 }, { x: 2, y: 3 }];
+  const third = [{ x: 3, y: 3 }];
+  const fourth = [{ x: 4, y: 4 }];
+  const afterOne = sealPath([], first, 1);
+  const afterTwo = sealPath(afterOne.echoes, second, 2);
+  assert.equal(afterTwo.echoes.length, 1);
+  assert.deepEqual(ghostPoint(afterOne.echoes[0], 5, 1), { x: 1, y: 1 });
+  assert.deepEqual(afterTwo.echoes[0], [...first, ...second]);
+  assert.deepEqual(ghostPoint(afterTwo.echoes[0], 0, 1), { x: 1, y: 1 });
+  const joined = ghostPoint(afterTwo.echoes[0], Math.SQRT2, 1);
+  assert.ok(Math.abs(joined.x - 2) < 1e-9 && Math.abs(joined.y - 2) < 1e-9);
+  const secondPath = ghostPoint(afterTwo.echoes[0], Math.SQRT2 + 1, 1);
+  assert.ok(Math.abs(secondPath.x - 2) < 1e-9 && Math.abs(secondPath.y - 3) < 1e-9);
+  const afterThree = sealPath(afterTwo.echoes, third, 3);
+  assert.equal(afterThree.echoes.length, 2);
+  assert.deepEqual(afterThree.echoes[0], [...first, ...second]);
+  assert.deepEqual(afterThree.echoes[1], third);
+  const afterFour = sealPath(afterThree.echoes, fourth, 4);
+  assert.equal(afterFour.echoes.length, 2);
+  assert.deepEqual(afterFour.echoes[1], [...third, ...fourth]);
+  second[0].x = 90;
+  assert.equal(afterFour.echoes[0][1].x, 2);
+  assert.equal(roundPressure(3).playback, 104);
+  assert.equal(roundPressure(4).playback, 103);
+  assert.ok(roundPressure(5).playback > roundPressure(3).playback);
+});
+
+test('cosmetics are free, coins, ads, or a store rating', () => {
+  assert.deepEqual(itemOffer({ price: 0 }), { kind: 'free', ads: 0, price: 0 });
+  assert.deepEqual(itemOffer({ price: 780 }), { kind: 'coin', ads: 0, price: 780 });
+  assert.deepEqual(itemOffer({ price: 0, offer: 'ad', ads: 1 }), { kind: 'ad', ads: 1, price: 0 });
+  assert.deepEqual(itemOffer({ price: 4000, ads: 10, offer: 'either' }), { kind: 'either', ads: 10, price: 4000 });
+  assert.deepEqual(itemOffer({ price: 2200, ads: 5 }), { kind: 'either', ads: 5, price: 2200 });
+  assert.deepEqual(itemOffer({ price: 0, offer: 'rate' }), { kind: 'rate', ads: 0, price: 0 });
+  assert.equal(FLAGS.length >= 190, true);
+  assert.equal(new Set(FLAGS.map((flag) => flag.id)).size, FLAGS.length);
+  assert.deepEqual(flagTrail(flagById('il')), ['#ffffff', '#0038b8']);
+  assert.equal(countryName('il', 'he'), 'ישראל');
 });
 
 test('shield and round-start grace block echo hits', () => {
@@ -169,23 +239,23 @@ test('a slide moves by the finger delta and does not jump to the finger', () => 
 
 test('later rounds speed the echoes up, shorten the grace, and pull coins into a cluster', () => {
   assert.deepEqual(roundPressure(1), { playback: 100, grace: 75, spacing: 78, reach: Infinity });
-  assert.deepEqual(roundPressure(2), { playback: 104, grace: 73, spacing: 77, reach: 312 });
-  assert.equal(roundPressure(8).playback, 128);
+  assert.deepEqual(roundPressure(2), { playback: 99, grace: 73, spacing: 77, reach: 312 });
+  assert.equal(roundPressure(8).playback, 111);
   assert.equal(roundPressure(8).grace, 61);
   assert.equal(roundPressure(8).spacing, 71);
   assert.equal(roundPressure(8).reach, 264);
   const twelve = roundPressure(12);
-  assert.equal(twelve.playback, 144);
+  assert.equal(twelve.playback, 119);
   assert.equal(twelve.grace, 53);
   assert.equal(twelve.spacing, 67);
   assert.equal(twelve.reach, 232);
-  assert.equal(roundPressure(16).playback, 160);
+  assert.equal(roundPressure(16).playback, 127);
   assert.equal(roundPressure(22).grace, 40);
   assert.equal(roundPressure(22).reach, 170);
   assert.equal(roundPressure(24).spacing, 56);
   assert.equal(echoClock(0, 8), 0);
   assert.equal(echoClock(10, 1), 10);
-  assert.equal(echoClock(10, 6), 12);
+  assert.ok(Math.abs(echoClock(10, 6) - 10.7) < 1e-9);
   assert.equal(echoClock(-4, 6), 0);
 
   let n = 0;
@@ -236,4 +306,22 @@ test('spawns stay away from the player when the field has room', () => {
     [{ x: 10, y: 10, minDist: 90 }],
   );
   assert.ok(Math.hypot(point.x - 10, point.y - 10) >= 90);
+});
+
+test('missiles are the rare field power and meteors stay near one in thirty', () => {
+  let missiles = 0;
+  for (let i = 0; i < 1100; i += 1) {
+    if (pickPowerType(() => (i % 11) / 11) === 'MISSILE') missiles += 1;
+  }
+  assert.ok(missiles < 200);
+  for (let i = 0; i < 20; i += 1) {
+    assert.notEqual(pickPowerType(() => i / 20, false), 'MISSILE');
+  }
+  assert.equal(shouldSpawnMeteor(() => 0.02), true);
+  assert.equal(shouldSpawnMeteor(() => 0.2), false);
+  const ends = pickMeteorEnds(() => 0.1, 400);
+  assert.ok(Math.abs(ends.endX - ends.startX) >= 400 * 0.38);
+  const velocity = meteorVelocity(ends.startX, ends.endX, 800, 24);
+  assert.ok(Math.abs(velocity.vx) > 1);
+  assert.ok(velocity.vy > 20);
 });
