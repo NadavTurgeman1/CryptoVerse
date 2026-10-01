@@ -1834,7 +1834,7 @@ function drawHat(kind, radius, accent) {
       ctx.fill();
     }
   } else if (kind === 'beanie') {
-    ctx.translate(0, -r * 0.28);
+    ctx.translate(0, -r * 0.08);
     ctx.fillStyle = '#6d28d9';
     ctx.beginPath();
     ctx.moveTo(-r * 0.78, -r * 0.7);
@@ -1892,30 +1892,25 @@ function drawHat(kind, radius, accent) {
     fillDot(r * 0.46, -r * 1.52, r * 0.16, '#fff');
   } else if (kind === 'dogears') {
     for (const side of [-1, 1]) {
-      ctx.fillStyle = '#8b5a2b';
+      ctx.save();
+      ctx.translate(side * r * 0.58, -r * 1.38);
+      ctx.rotate(side * 0.72);
+      ctx.fillStyle = '#a56a3a';
       ctx.beginPath();
-      ctx.moveTo(side * r * 0.28, -r * 1.08);
-      ctx.quadraticCurveTo(side * r * 0.12, -r * 1.52, side * r * 0.4, -r * 1.74);
-      ctx.quadraticCurveTo(side * r * 0.78, -r * 1.84, side * r * 0.9, -r * 1.46);
-      ctx.quadraticCurveTo(side * r * 1.12, -r * 0.92, side * r * 0.8, -r * 0.66);
-      ctx.quadraticCurveTo(side * r * 0.52, -r * 0.58, side * r * 0.46, -r * 0.98);
-      ctx.quadraticCurveTo(side * r * 0.52, -r * 1.12, side * r * 0.4, -r * 1.02);
+      ctx.moveTo(-r * 0.22, r * 0.34);
+      ctx.quadraticCurveTo(-r * 0.46, -r * 0.05, -r * 0.16, -r * 0.46);
+      ctx.quadraticCurveTo(r * 0.22, -r * 0.58, r * 0.4, -r * 0.08);
+      ctx.quadraticCurveTo(r * 0.42, r * 0.32, r * 0.06, r * 0.4);
       ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = '#f0a0b8';
+      ctx.fillStyle = '#e56b93';
       ctx.beginPath();
-      ctx.moveTo(side * r * 0.34, -r * 1.18);
-      ctx.quadraticCurveTo(side * r * 0.26, -r * 1.48, side * r * 0.44, -r * 1.6);
-      ctx.quadraticCurveTo(side * r * 0.66, -r * 1.66, side * r * 0.72, -r * 1.4);
-      ctx.lineTo(side * r * 0.48, -r * 1.2);
+      ctx.moveTo(-r * 0.1, -r * 0.22);
+      ctx.lineTo(r * 0.12, -r * 0.08);
+      ctx.lineTo(-r * 0.02, r * 0.26);
       ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = 'rgba(70, 40, 18, 0.4)';
-      ctx.lineWidth = Math.max(1, r * 0.03);
-      ctx.beginPath();
-      ctx.moveTo(side * r * 0.46, -r * 1.22);
-      ctx.quadraticCurveTo(side * r * 0.68, -r * 1.42, side * r * 0.84, -r * 1.38);
-      ctx.stroke();
+      ctx.restore();
     }
   } else if (kind === 'catears') {
     for (const side of [-1, 1]) {
@@ -2173,6 +2168,7 @@ function drawHat(kind, radius, accent) {
       ctx.restore();
     }
   } else if (kind === 'sombrero') {
+    ctx.translate(0, -r * 0.16);
     ctx.fillStyle = '#e7c27a';
     ctx.beginPath();
     ctx.ellipse(0, -r * 0.9, r * 1.28, r * 0.2, 0, 0, Math.PI * 2);
