@@ -9,7 +9,7 @@ export function storeUrl() {
   if (ios && APPLE_APP_ID) {
     return `https://apps.apple.com/app/id${APPLE_APP_ID}?action=write-review`;
   }
-  if (ios) return 'https://apps.apple.com/search?term=Mimic';
+  if (ios) return 'https://apps.apple.com/search?term=TurNov';
   return 'https://play.google.com/store/apps/details?id=com.nadavturgeman.cryptoverse&showAllReviews=true';
 }
 

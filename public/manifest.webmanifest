@@ -1,10 +1,10 @@
 {
-  "name": "Mimic",
-  "short_name": "Mimic",
+  "name": "TurNov",
+  "short_name": "TurNov",
   "description": "Slide a fireball, collect three coins, and outrun your own route.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#05060c",
+  "background_color": "#000000",
   "theme_color": "#0d0f18",
   "lang": "en",
   "icons": [
