@@ -1,6 +1,7 @@
 {
   "name": "echo-arcade",
   "version": "0.0.0",
+  "author": "TurNov Games",
   "private": true,
   "type": "module",
   "scripts": {

@@ -1,7 +1,7 @@
 {
-  "name": "TurNov",
-  "short_name": "TurNov",
-  "description": "Slide a fireball, collect three coins, and outrun your own route.",
+  "name": "Mimic",
+  "short_name": "Mimic",
+  "description": "Mimic by TurNov Games. Slide a fireball, collect three coins, and outrun your own route.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",

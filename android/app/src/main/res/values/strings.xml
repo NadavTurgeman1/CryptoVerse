@@ -1,7 +1,8 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">TurNov</string>
-    <string name="title_activity_main">TurNov</string>
+    <string name="app_name">Mimic</string>
+    <string name="title_activity_main">Mimic</string>
+    <string name="developer_name">TurNov Games</string>
     <string name="package_name">com.nadavturgeman.cryptoverse</string>
     <string name="custom_url_scheme">com.nadavturgeman.cryptoverse</string>
 </resources>
