@@ -199,8 +199,10 @@ const COINS = [
   { id: 'doge' },
   { id: 'bnb' },
 ];
-const JOYSTICK_RADIUS = 56;
-const JOYSTICK_DEADZONE = 0.16;
+const JOYSTICK_RADIUS = 64;
+const JOYSTICK_DEADZONE = 0.12;
+/** Pixels per frame at full stick tilt — close to a firm finger slide. */
+const JOYSTICK_SPEED = 8.2;
 
 const STORAGE = {
   coins: 'echo_coins',
@@ -738,6 +740,11 @@ function clearJoystick() {
   joystick.x = 0;
   joystick.y = 0;
   joystick.amount = 0;
+  // Stop immediately — no leftover chase toward an old target.
+  player.targetX = player.x;
+  player.targetY = player.y;
+  player.vx = 0;
+  player.vy = 0;
 }
 
 function setMode(mode) {
@@ -2282,11 +2289,29 @@ function collectPowerups() {
 }
 
 function movePlayer() {
-  if (usesJoystick() && joystick.active && joystick.amount > JOYSTICK_DEADZONE) {
-    const lead = (8 / 0.2) * joystick.amount;
-    player.targetX = player.x + (joystick.x / joystick.amount) * lead;
-    player.targetY = player.y + (joystick.y / joystick.amount) * lead;
-  } else if (!isDragging) {
+  // Joystick: direct velocity from stick tilt — no chase-target lag or coasting.
+  if (usesJoystick() && joystick.active) {
+    const previousX = player.x;
+    const previousY = player.y;
+    if (joystick.amount > JOYSTICK_DEADZONE) {
+      const live = (joystick.amount - JOYSTICK_DEADZONE) / (1 - JOYSTICK_DEADZONE);
+      const scale = (live / joystick.amount) * JOYSTICK_SPEED;
+      player.x += joystick.x * scale;
+      player.y += joystick.y * scale;
+    }
+    player.x = clampToField(player.x, player.radius, view.w - player.radius);
+    player.y = clampToField(player.y, player.radius, view.h - player.radius);
+    player.targetX = player.x;
+    player.targetY = player.y;
+    player.vx = player.x - previousX;
+    player.vy = player.y - previousY;
+    if (player.vx * player.vx + player.vy * player.vy >= 0.12) {
+      playerFace = Math.atan2(player.vy, player.vx);
+    }
+    return;
+  }
+
+  if (!isDragging) {
     let dx = 0;
     let dy = 0;
     if (keys.has('ArrowLeft') || keys.has('KeyA')) dx -= 1;

@@ -4,30 +4,26 @@
     <dependencies>
         <deployment identifier="iOS"/>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="21679"/>
-        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <scenes>
-        <!--Launch-->
         <scene sceneID="EHf-IW-A2E">
             <objects>
                 <viewController id="01J-lp-oVM" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
                         <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
-                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                         <subviews>
-                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="LaunchLogo" translatesAutoresizingMaskIntoConstraints="NO" id="logo-iv">
+                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" image="LaunchLogo" translatesAutoresizingMaskIntoConstraints="NO" id="logo-iv">
                                 <rect key="frame" x="57" y="298" width="300" height="300"/>
                             </imageView>
                         </subviews>
-                        <viewLayoutGuide key="safeArea" id="safe-area"/>
                         <color key="backgroundColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
                             <constraint firstItem="logo-iv" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="cX"/>
                             <constraint firstItem="logo-iv" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="cY"/>
-                            <constraint firstItem="logo-iv" firstAttribute="width" secondItem="Ze5-6b-2t3" secondAttribute="width" multiplier="0.72" id="wMax"/>
-                            <constraint firstItem="logo-iv" firstAttribute="height" secondItem="logo-iv" secondAttribute="width" id="aspect"/>
-                            <constraint firstItem="logo-iv" firstAttribute="width" relation="lessThanOrEqual" constant="420" id="cap"/>
+                            <constraint firstItem="logo-iv" firstAttribute="width" secondItem="Ze5-6b-2t3" secondAttribute="width" multiplier="0.72" id="w"/>
+                            <constraint firstItem="logo-iv" firstAttribute="height" secondItem="logo-iv" secondAttribute="width" id="h"/>
                         </constraints>
                     </view>
                 </viewController>
