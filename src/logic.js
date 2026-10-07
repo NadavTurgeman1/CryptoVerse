@@ -37,16 +37,10 @@ export function sanitizeUnlocks(list, catalogIds) {
 /** Pixels traveled each frame when playback is 100. Round pressure scales this. */
 export const GHOST_SPEED = 6;
 
-const routeCount = new WeakMap();
-
-function tagRoutes(echo, count) {
-  routeCount.set(echo, count);
-  return echo;
-}
-
 /**
  * Walk the sealed route at a steady pace.
- * One route restarts at the first point. Two routes also travel back to that start.
+ * Reaching the last point jumps back to the first. The ghost never cuts
+ * across empty space to close the loop.
  * Extra samples from standing still add no distance.
  */
 export function ghostPoint(echo, frame, speed = GHOST_SPEED) {
@@ -62,7 +56,6 @@ export function ghostPoint(echo, frame, speed = GHOST_SPEED) {
     total += length;
   };
   for (let i = 1; i < echo.length; i += 1) push(echo[i - 1], echo[i]);
-  if (routeCount.get(echo) === 2) push(echo[echo.length - 1], echo[0]);
   if (!(total > 0)) return home;
 
   const ticks = Number(frame);
@@ -150,20 +143,17 @@ export function hitsEcho(player, echoes, frame, hitDist, vulnerable) {
 
 /**
  * Keep the finished route. Odd rounds add a ghost with that one path.
- * Even rounds extend the newest ghost, so it walks the first path,
- * then the second, then back to the start. Later edits to `path` must not rewrite history.
+ * Even rounds extend the newest ghost, so it walks the first path and then the second.
+ * Later edits to `path` must not rewrite history.
  */
 export function sealPath(echoes, path, round) {
-  const sealed = tagRoutes(path.map((point) => ({ x: point.x, y: point.y })), 1);
-  const next = echoes.map((echo) => tagRoutes(
-    echo.map((point) => ({ x: point.x, y: point.y })),
-    routeCount.get(echo) === 2 ? 2 : 1,
-  ));
+  const sealed = path.map((point) => ({ x: point.x, y: point.y }));
+  const next = echoes.map((echo) => echo.map((point) => ({ x: point.x, y: point.y })));
   const finished = Math.max(1, Math.floor(Number(round)) || 1);
   if (finished % 2 === 1 || next.length === 0) next.push(sealed);
   else {
     const last = next[next.length - 1];
-    next[next.length - 1] = tagRoutes([...last, ...sealed], 2);
+    next[next.length - 1] = [...last, ...sealed];
   }
   return {
     echoes: next,
