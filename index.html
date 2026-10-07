@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#0d0f18" />
-    <title>CryptoVerse</title>
+    <title>Mimic</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -44,9 +44,9 @@
       <div id="live" class="sr-only" aria-live="polite"></div>
 
       <div id="main-menu" class="screen">
-        <h1 class="logo"><span class="logo-crypto">Crypto</span><span class="logo-verse">Verse</span></h1>
+        <h1 class="logo"><span class="logo-crypto">Mim</span><span class="logo-verse">ic</span></h1>
         <p class="best" id="menu-best">No record yet</p>
-        <p class="how-to" data-i18n="howTo">Slide to move. Collect 3 coins. Your route comes back.</p>
+        <p class="how-to" data-i18n="howTo">Slide to move. Collect 3 coins. A double runs your route.</p>
         <button type="button" class="btn" id="start-btn" data-i18n="play">Play</button>
         <button type="button" class="btn btn-secondary" id="tutorial-btn" data-i18n="tutorial">Tutorial</button>
         <button type="button" class="btn btn-secondary" id="shop-btn" data-i18n="shop">Shop</button>
@@ -78,8 +78,8 @@
             <canvas id="loadout-preview" width="240" height="168" aria-label="Preview of the shop items you are trying on"></canvas>
             <div class="preview-switch" role="tablist">
               <button type="button" class="preview-tab" id="preview-powers" data-i18n="powers">Powers</button>
-              <button type="button" class="preview-tab" id="preview-echo" data-i18n="echoes">Echoes</button>
-              <button type="button" class="preview-tab" id="preview-player" data-i18n="meteorLook">Fireball</button>
+              <button type="button" class="preview-tab" id="preview-echo" data-i18n="echoes">Doubles</button>
+              <button type="button" class="preview-tab" id="preview-player" data-i18n="meteorLook">Runner</button>
               <button type="button" class="preview-tab" id="preview-coins" data-i18n="coinPacks">Coins</button>
             </div>
           </div>
@@ -115,7 +115,7 @@
           <div class="shop-grid" id="player-flag-shop"></div>
         </div>
         <div class="panel-box">
-          <div class="panel-title" data-i18n="meteorColors">Fireball</div>
+          <div class="panel-title" data-i18n="meteorColors">Runner</div>
           <div class="shop-grid" id="player-shop-grid"></div>
         </div>
         <div class="panel-box">
@@ -176,9 +176,9 @@
       <div id="tutorial-screen" class="screen hidden">
         <h1 data-i18n="tutorial">Tutorial</h1>
         <div class="panel-box tutorial-copy">
-          <p data-i18n="tutorialMove">Slide anywhere to move the fireball.</p>
-          <p data-i18n="tutorialCoins">Collect 3 coins. The path you drew comes back as an echo.</p>
-          <p data-i18n="tutorialMissile">A stored missile removes the oldest echo.</p>
+          <p data-i18n="tutorialMove">Slide anywhere to move.</p>
+          <p data-i18n="tutorialCoins">Collect 3 coins. The path you drew comes back as your double.</p>
+          <p data-i18n="tutorialMissile">A stored missile removes the oldest double.</p>
           <p data-i18n="tutorialShield">A stored shield blocks the next hit, then drops.</p>
         </div>
         <button type="button" class="btn" id="close-tutorial" data-i18n="gotIt">Got it</button>
@@ -186,7 +186,7 @@
 
       <div id="pause-screen" class="screen hidden">
         <h1 data-i18n="paused">Paused</h1>
-        <p class="how-to" data-i18n="howTo">Slide to move. Collect 3 coins. Your route comes back.</p>
+        <p class="how-to" data-i18n="howTo">Slide to move. Collect 3 coins. A double runs your route.</p>
         <button type="button" class="btn" id="resume-btn" data-i18n="resume">Resume</button>
         <button type="button" class="btn btn-secondary" id="pause-menu-btn" data-i18n="mainMenu">Main menu</button>
       </div>
@@ -214,7 +214,7 @@
 
       <div id="rate-overlay" class="overlay hidden" inert>
         <div class="overlay-card">
-          <h2 id="rate-title">Rate CryptoVerse</h2>
+          <h2 id="rate-title">Rate Mimic</h2>
           <p id="rate-body" class="subtitle"></p>
           <button type="button" class="btn" id="rate-go">Rate now</button>
           <button type="button" class="btn btn-secondary" id="rate-later">Not now</button>

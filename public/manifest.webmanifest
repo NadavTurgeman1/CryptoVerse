@@ -1,6 +1,6 @@
 {
-  "name": "CryptoVerse",
-  "short_name": "CryptoVerse",
+  "name": "Mimic",
+  "short_name": "Mimic",
   "description": "Slide a fireball, collect three coins, and outrun your own route.",
   "start_url": "/",
   "display": "standalone",

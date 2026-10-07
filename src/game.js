@@ -2864,101 +2864,116 @@ function drawRibbon(points, color, width, alpha) {
   ctx.restore();
 }
 
-function flameTongue(angle, length, width) {
-  const px = Math.cos(angle);
-  const py = Math.sin(angle);
-  const nx = -py;
-  const ny = px;
-  const mid = length * 0.48;
+function paintLimb(x, y, width, height, rotation, fill, hollow) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
   ctx.beginPath();
-  ctx.moveTo(nx * width * 0.22, ny * width * 0.22);
-  ctx.quadraticCurveTo(px * mid + nx * width, py * mid + ny * width, px * length, py * length);
-  ctx.quadraticCurveTo(px * mid - nx * width, py * mid - ny * width, -nx * width * 0.22, -ny * width * 0.22);
-  ctx.closePath();
+  if (typeof ctx.roundRect === 'function') ctx.roundRect(-width / 2, 0, width, height, width / 2);
+  else ctx.rect(-width / 2, 0, width, height);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  if (hollow) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.88)';
+    ctx.lineWidth = Math.max(1.1, width * 0.22);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** The runner and the hollow double share one silhouette. Hats sit on this head. */
+function paintRunner(radius, phase, look) {
+  const r = radius;
+  const hollow = Boolean(look.hollow);
+  const cloth = look.cloth || '#ffb000';
+  const skin = look.skin || '#f6d7b8';
+  const step = Math.sin(phase * 0.34);
+  const limb = hollow ? 'rgba(255,255,255,0.16)' : cloth;
+  const arm = hollow ? 'rgba(255,255,255,0.16)' : skin;
+
+  ctx.fillStyle = hollow ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.28)';
+  ctx.beginPath();
+  ctx.ellipse(0, r * 1.02, r * 0.46, r * 0.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  paintLimb(-r * 0.16, r * 0.28, r * 0.2, r * 0.62, -step * 0.65, limb, hollow);
+  paintLimb(r * 0.16, r * 0.28, r * 0.2, r * 0.62, step * 0.65, limb, hollow);
+  paintLimb(-r * 0.46, -r * 0.15, r * 0.14, r * 0.42, step * 0.75, arm, hollow);
+  paintLimb(r * 0.46, -r * 0.15, r * 0.14, r * 0.42, -step * 0.75, arm, hollow);
+
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') ctx.roundRect(-r * 0.34, -r * 0.22, r * 0.68, r * 0.58, r * 0.18);
+  else ctx.rect(-r * 0.34, -r * 0.22, r * 0.68, r * 0.58);
+  ctx.fillStyle = hollow ? hexAlpha(cloth, 0.2) : cloth;
+  ctx.fill();
+  if (!hollow) {
+    ctx.strokeStyle = 'rgba(20, 10, 4, 0.35)';
+    ctx.lineWidth = Math.max(1.2, r * 0.05);
+    ctx.stroke();
+  }
+  if (look.flag) {
+    ctx.save();
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') ctx.roundRect(-r * 0.34, -r * 0.22, r * 0.68, r * 0.58, r * 0.18);
+    else ctx.rect(-r * 0.34, -r * 0.22, r * 0.68, r * 0.58);
+    ctx.clip();
+    paintGhostFlag(ctx, r * 0.72, look.flag);
+    ctx.restore();
+  }
+  if (hollow) {
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') ctx.roundRect(-r * 0.34, -r * 0.22, r * 0.68, r * 0.58, r * 0.18);
+    else ctx.rect(-r * 0.34, -r * 0.22, r * 0.68, r * 0.58);
+    ctx.strokeStyle = 'rgba(255,255,255,0.88)';
+    ctx.lineWidth = Math.max(1.2, r * 0.06);
+    ctx.stroke();
+  }
+
+  const headY = -r * 0.72;
+  ctx.beginPath();
+  ctx.arc(0, headY, r * 0.5, 0, Math.PI * 2);
+  ctx.fillStyle = hollow ? 'rgba(255,255,255,0.14)' : skin;
+  ctx.fill();
+  if (!hollow) {
+    ctx.strokeStyle = 'rgba(20, 10, 4, 0.35)';
+    ctx.lineWidth = Math.max(1.2, r * 0.05);
+    ctx.stroke();
+  }
+  if (hollow) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = Math.max(1.2, r * 0.06);
+    ctx.stroke();
+  }
+
+  const eyeY = -r * 0.68;
+  const eyeR = Math.max(2, r * 0.12);
+  const blink = Math.sin(phase * 0.35) > 0.97 ? 0.25 : 1;
+  ctx.fillStyle = hollow ? 'rgba(8, 10, 18, 0.92)' : '#f8fafc';
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.16, eyeY, eyeR * 0.72, eyeR * blink, 0, 0, Math.PI * 2);
+  ctx.ellipse(r * 0.16, eyeY, eyeR * 0.72, eyeR * blink, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (!hollow) {
+    ctx.fillStyle = cloth;
+    ctx.beginPath();
+    ctx.arc(-r * 0.16, eyeY, eyeR * 0.28, 0, Math.PI * 2);
+    ctx.arc(r * 0.16, eyeY, eyeR * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 function drawFireball(x, y, radius, phase, alpha, heading = null, style = null) {
   ctx.save();
   ctx.translate(x, y);
   ctx.globalAlpha = alpha;
-  const boiling = heading == null;
+  if (heading != null) ctx.rotate(Math.cos(heading) * 0.28);
   const palette = firePalette(style);
-
-  const heat = ctx.createRadialGradient(0, radius * 0.08, radius * 0.1, 0, 0, radius * 2.8);
-  heat.addColorStop(0, palette.heat[0]);
-  heat.addColorStop(0.22, palette.heat[1]);
-  heat.addColorStop(0.55, palette.heat[2]);
-  heat.addColorStop(1, palette.heat[3]);
-  ctx.fillStyle = heat;
-  ctx.beginPath();
-  ctx.arc(0, 0, radius * 2.8, 0, Math.PI * 2);
-  ctx.fill();
-
-  for (let i = 0; i < 14; i += 1) {
-    const flicker = Math.sin(phase * 3.6 + i * 1.55) * 0.28;
-    const around = (i / 14) * Math.PI * 2 + flicker;
-    const angle = boiling ? around : heading + (i / 13 - 0.5) * 2.2 + flicker * 0.7;
-    const reach = boiling ? 1.05 : 1.65;
-    const length = radius * (reach + Math.sin(phase * 4.8 + i * 1.1) * 0.48 + (i % 3 === 0 ? 0.38 : 0));
-    const width = radius * (0.42 + (i % 2) * 0.14);
-    const hot = i % 3 !== 1;
-    const tongue = ctx.createLinearGradient(0, 0, Math.cos(angle) * length, Math.sin(angle) * length);
-    const tongueColors = hot ? palette.tongueHot : palette.tongueCool;
-    tongue.addColorStop(0, tongueColors[0]);
-    tongue.addColorStop(0.4, tongueColors[1]);
-    tongue.addColorStop(1, palette.tongueEnd);
-    ctx.fillStyle = tongue;
-    flameTongue(angle, length, width);
-    ctx.fill();
-  }
-
-  ctx.beginPath();
-  for (let i = 0; i <= 28; i += 1) {
-    const angle = (i / 28) * Math.PI * 2;
-    const boil = 1 + Math.sin(phase * 5.2 + i * 1.15) * 0.18 + Math.sin(phase * 2.4 + i * 0.6) * 0.07;
-    const px = Math.cos(angle) * radius * boil;
-    const py = Math.sin(angle) * radius * boil * 0.94;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  const body = ctx.createRadialGradient(-radius * 0.2, -radius * 0.24, radius * 0.04, 0, radius * 0.08, radius * 1.05);
-  body.addColorStop(0, palette.body[0]);
-  body.addColorStop(0.22, palette.body[1]);
-  body.addColorStop(0.5, palette.body[2]);
-  body.addColorStop(0.78, palette.body[3]);
-  body.addColorStop(1, palette.body[4]);
-  ctx.fillStyle = body;
-  ctx.fill();
-
-  if (palette.flag) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(0, 0, radius * 0.82, 0, Math.PI * 2);
-    ctx.clip();
-    const aspect = palette.flag.layout === 'israel' ? 11 / 8 : 3 / 2;
-    const flagW = radius * 1.85;
-    const flagH = flagW / aspect;
-    drawFlag(ctx, -flagW / 2, -flagH / 2, flagW, flagH, palette.flag);
-    ctx.restore();
-  } else {
-    ctx.fillStyle = palette.core;
-    ctx.beginPath();
-    ctx.arc(-radius * 0.08, -radius * 0.1, radius * 0.38, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  for (let i = 0; i < 8; i += 1) {
-    const life = (phase * 0.18 + i / 8) % 1;
-    const drift = boiling ? (i / 8) * Math.PI * 2 : heading + (i - 3.5) * 0.28;
-    const angle = drift + Math.sin(phase + i) * 0.2;
-    const dist = radius * (0.4 + life * 2.5);
-    ctx.globalAlpha = alpha * (1 - life) * 0.95;
-    ctx.fillStyle = life < 0.3 ? palette.sparkHot : palette.sparkCool;
-    ctx.beginPath();
-    ctx.arc(Math.cos(angle) * dist, Math.sin(angle) * dist, 1.2 + (1 - life) * 2.1, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  paintRunner(radius, phase, {
+    hollow: false,
+    cloth: palette.body[2],
+    skin: palette.body[1],
+    flag: palette.flag,
+  });
   ctx.restore();
 }
 
@@ -3599,7 +3614,7 @@ function drawGlasses(kind, radius) {
   }
 
   const r = radius;
-  const eyeY = -r * 0.18;
+  const eyeY = -r * 0.68;
   ctx.save();
   if (kind === 'rounds' || kind === 'nerd') {
     ctx.strokeStyle = kind === 'nerd' ? '#111827' : '#f4efe2';
@@ -3711,8 +3726,8 @@ function drawGlasses(kind, radius) {
   } else if (kind === 'mustache') {
     ctx.fillStyle = '#3a2414';
     ctx.beginPath();
-    ctx.ellipse(-r * 0.22, r * 0.28, r * 0.28, r * 0.12, -0.35, 0, Math.PI * 2);
-    ctx.ellipse(r * 0.22, r * 0.28, r * 0.28, r * 0.12, 0.35, 0, Math.PI * 2);
+    ctx.ellipse(-r * 0.22, eyeY + r * 0.4, r * 0.28, r * 0.12, -0.35, 0, Math.PI * 2);
+    ctx.ellipse(r * 0.22, eyeY + r * 0.4, r * 0.28, r * 0.12, 0.35, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -3725,18 +3740,6 @@ function roundBox(x, y, width, height, radius) {
   ctx.fill();
 }
 
-function traceGhost(radius, phase) {
-  const wave = (index) => Math.sin(phase * 2.4 + index) * radius * 0.18;
-  ctx.beginPath();
-  ctx.moveTo(-radius * 0.92, radius * 0.05);
-  ctx.bezierCurveTo(-radius * 1.08, -radius * 0.95, -radius * 0.45, -radius * 1.35, 0, -radius * 1.28);
-  ctx.bezierCurveTo(radius * 0.5, -radius * 1.35, radius * 1.08, -radius * 0.9, radius * 0.92, radius * 0.08);
-  ctx.quadraticCurveTo(radius * 0.62, radius * 0.95 + wave(0), radius * 0.28, radius * 0.22);
-  ctx.quadraticCurveTo(0, radius * 1.15 + wave(1.4), -radius * 0.32, radius * 0.2);
-  ctx.quadraticCurveTo(-radius * 0.68, radius * 1.02 + wave(2.6), -radius * 0.92, radius * 0.05);
-  ctx.closePath();
-}
-
 function drawSpirit(x, y, options) {
   const radius = options.radius ?? 17;
   const color = options.color ?? '#00f0ff';
@@ -3745,7 +3748,7 @@ function drawSpirit(x, y, options) {
   const lean = options.lean ?? 0;
   const hollow = options.hollow ?? false;
   const aura = options.aura !== false;
-  const bob = Math.sin(phase) * 1.8;
+  const bob = Math.sin(phase) * 1.4;
 
   ctx.save();
   ctx.translate(x, y + bob);
@@ -3753,90 +3756,25 @@ function drawSpirit(x, y, options) {
   ctx.globalAlpha = alpha;
 
   if (aura) {
-    const haze = ctx.createRadialGradient(0, -radius * 0.1, radius * 0.2, 0, 0, radius * 2.5);
-    haze.addColorStop(0, hexAlpha(color, hollow ? 0.32 : 0.5));
+    const haze = ctx.createRadialGradient(0, -radius * 0.2, radius * 0.2, 0, 0, radius * 2.2);
+    haze.addColorStop(0, hexAlpha(color, hollow ? 0.28 : 0.4));
     haze.addColorStop(1, hexAlpha(color, 0));
     ctx.fillStyle = haze;
     ctx.beginPath();
-    ctx.arc(0, 0, radius * 2.5, 0, Math.PI * 2);
+    ctx.arc(0, 0, radius * 2.2, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  ctx.fillStyle = hexAlpha(color, hollow ? 0.16 : 0.22);
-  ctx.beginPath();
-  ctx.ellipse(0, radius * 0.95, radius * 0.72, radius * 0.16, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  traceGhost(radius, phase);
-  const body = ctx.createLinearGradient(0, -radius * 1.2, 0, radius);
-  if (hollow) {
-    body.addColorStop(0, 'rgba(255, 255, 255, 0.78)');
-    body.addColorStop(0.42, hexAlpha(color, 0.62));
-    body.addColorStop(1, hexAlpha(color, 0.1));
-  } else {
-    body.addColorStop(0, 'rgba(255, 255, 255, 0.92)');
-    body.addColorStop(0.38, hexAlpha(color, 0.95));
-    body.addColorStop(1, hexAlpha(color, 0.35));
-  }
-  ctx.fillStyle = body;
-  ctx.fill();
-
-  if (options.flagId) {
-    const flag = flagById(options.flagId);
-    if (flag) {
-      ctx.save();
-      traceGhost(radius, phase);
-      ctx.clip();
-      paintGhostFlag(ctx, radius, flag);
-      ctx.restore();
-    }
-  }
-
-  ctx.save();
-  traceGhost(radius, phase);
-  ctx.clip();
-  ctx.fillStyle = hollow ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.28)';
-  ctx.beginPath();
-  ctx.ellipse(-radius * 0.28, -radius * 0.48, radius * 0.26, radius * 0.46, -0.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  traceGhost(radius, phase);
-  ctx.strokeStyle = hollow ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.7)';
-  ctx.lineWidth = hollow ? 1 : 1.4;
-  ctx.stroke();
-
-  const eyeY = -radius * 0.18;
-  const eyeR = Math.max(2.2, radius * 0.15);
-  const blink = Math.sin(phase * 0.35) > 0.97 ? 0.25 : 1;
-  ctx.fillStyle = hollow ? 'rgba(18, 0, 12, 0.88)' : 'rgba(255,255,255,0.95)';
-  ctx.beginPath();
-  ctx.ellipse(-radius * 0.32, eyeY, eyeR * 0.72, eyeR * blink, 0, 0, Math.PI * 2);
-  ctx.ellipse(radius * 0.3, eyeY, eyeR * 0.72, eyeR * blink, 0, 0, Math.PI * 2);
-  ctx.fill();
-  if (!hollow) {
-    ctx.fillStyle = hexAlpha(color, 0.9);
-    ctx.beginPath();
-    ctx.arc(-radius * 0.32, eyeY, eyeR * 0.28, 0, Math.PI * 2);
-    ctx.arc(radius * 0.3, eyeY, eyeR * 0.28, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  const flag = options.flagId ? flagById(options.flagId) : null;
+  paintRunner(radius, phase, {
+    hollow,
+    cloth: color,
+    skin: hollow ? '#f8fafc' : '#f6d7b8',
+    flag,
+  });
 
   if (options.glasses && options.glasses !== 'none') drawGlasses(options.glasses, radius);
   if (options.hat && options.hat !== 'none') drawHat(options.hat, radius, color);
-
-  if (aura) {
-    for (let spark = 0; spark < 3; spark += 1) {
-      const rise = (phase * 0.15 + spark / 3) % 1;
-      const sx = Math.sin(phase * 1.3 + spark * 2.1) * radius * 0.85;
-      const sy = radius * 0.4 - rise * radius * 2.8;
-      ctx.globalAlpha = alpha * (1 - rise) * 0.7;
-      ctx.fillStyle = hollow ? '#ffd0dc' : '#ffffff';
-      ctx.beginPath();
-      ctx.arc(sx, sy, 1.3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
 
   ctx.restore();
 }

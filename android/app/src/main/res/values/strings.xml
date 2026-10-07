@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">CryptoVerse</string>
-    <string name="title_activity_main">CryptoVerse</string>
+    <string name="app_name">Mimic</string>
+    <string name="title_activity_main">Mimic</string>
     <string name="package_name">com.nadavturgeman.cryptoverse</string>
     <string name="custom_url_scheme">com.nadavturgeman.cryptoverse</string>
 </resources>
