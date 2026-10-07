@@ -78,17 +78,15 @@ export function ghostPoint(echo, frame, speed = GHOST_SPEED) {
 
 /**
  * Later rounds tighten the route you just drew, a little at a time.
- * Playback climbs slowly. A round that only extends a ghost speeds them up,
- * and a round that adds a ghost slows them a little, without breaking the climb.
+ * Playback rises only a hair each round so the loop barely feels faster.
  * Grace is frames of safety, spacing is how far apart coins stay,
  * and reach pulls them toward the first coin.
  */
 export function roundPressure(round) {
   const steps = Math.max(0, Math.floor(Number(round)) - 1);
   const safeSteps = Number.isFinite(steps) ? steps : 0;
-  const wave = safeSteps % 2 === 1 ? -3 : 0;
   return {
-    playback: Math.min(160, Math.max(90, 100 + safeSteps * 2 + wave)),
+    playback: Math.min(112, 100 + safeSteps * 0.35),
     grace: Math.max(40, 75 - safeSteps * 2),
     spacing: Math.max(56, 78 - safeSteps),
     reach: safeSteps === 0 ? Infinity : Math.max(170, 320 - safeSteps * 8),
@@ -142,12 +140,43 @@ export function hitsEcho(player, echoes, frame, hitDist, vulnerable) {
 }
 
 /**
+ * Soften a drawn route for playback: drop micro-jitters and average corners
+ * so the double keeps the same shape without twitchy turns.
+ */
+export function smoothRoute(points) {
+  if (!Array.isArray(points) || points.length === 0) return [];
+  const cleaned = [{ x: points[0].x, y: points[0].y }];
+  for (let i = 1; i < points.length; i += 1) {
+    const prev = cleaned[cleaned.length - 1];
+    const x = points[i].x;
+    const y = points[i].y;
+    if (Math.hypot(x - prev.x, y - prev.y) >= 0.75) cleaned.push({ x, y });
+  }
+  if (cleaned.length < 3) return cleaned;
+  let cur = cleaned;
+  for (let pass = 0; pass < 2; pass += 1) {
+    const next = [cur[0]];
+    for (let i = 1; i < cur.length - 1; i += 1) {
+      next.push({
+        x: (cur[i - 1].x + cur[i].x * 2 + cur[i + 1].x) / 4,
+        y: (cur[i - 1].y + cur[i].y * 2 + cur[i + 1].y) / 4,
+      });
+    }
+    next.push(cur[cur.length - 1]);
+    cur = next;
+  }
+  return cur;
+}
+
+/**
  * Keep the finished route. Odd rounds add a ghost with that one path.
  * Even rounds extend the newest ghost, so it walks the first path and then the second.
  * Later edits to `path` must not rewrite history.
+ * `priorClock` is the shared echo travel clock before the seal — kept so doubles
+ * do not jump back to the start when the round flips.
  */
-export function sealPath(echoes, path, round) {
-  const sealed = path.map((point) => ({ x: point.x, y: point.y }));
+export function sealPath(echoes, path, round, priorClock = 0) {
+  const sealed = smoothRoute(path);
   const next = echoes.map((echo) => echo.map((point) => ({ x: point.x, y: point.y })));
   const finished = Math.max(1, Math.floor(Number(round)) || 1);
   if (finished % 2 === 1 || next.length === 0) next.push(sealed);
@@ -155,10 +184,14 @@ export function sealPath(echoes, path, round) {
     const last = next[next.length - 1];
     next[next.length - 1] = [...last, ...sealed];
   }
+  const nextRound = round + 1;
+  const playback = roundPressure(nextRound).playback;
+  const clock = Number(priorClock);
+  const safeClock = Number.isFinite(clock) && clock > 0 ? clock : 0;
   return {
     echoes: next,
-    round: round + 1,
-    frame: 0,
+    round: nextRound,
+    frame: playback > 0 ? (safeClock * 100) / playback : safeClock,
   };
 }
 

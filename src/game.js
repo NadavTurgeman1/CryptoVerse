@@ -107,9 +107,9 @@ const GLASSES = [
   { id: 'mustache', nameKey: 'mustache', price: 90, slot: 'glasses' },
 ];
 
-const ADS_10 = new Set(['prism', 'astro', 'imperial']);
-const ADS_5 = new Set(['void', 'toxic', 'halo', 'pirate', 'goggles', 'monocle']);
-for (const item of [...COLORS, ...HATS, ...GLASSES]) {
+const ADS_10 = new Set(['prism']);
+const ADS_5 = new Set(['void', 'toxic']);
+for (const item of COLORS) {
   if (!(item.price > 0)) continue;
   const key = item.nameKey || item.id;
   const tier = ADS_10.has(key) ? 10 : ADS_5.has(key) ? 5 : 0;
@@ -121,26 +121,15 @@ for (const item of [...COLORS, ...HATS, ...GLASSES]) {
     item.offer = 'either';
   }
 }
-HATS.push({ id: 'laurel', nameKey: 'laurel', price: 0, slot: 'hat', offer: 'rate' });
-
-const PLAYER_BODIES = [
-  { id: 'classic', nameKey: 'meteorClassic', price: 0, slot: 'player' },
-  { id: '#f0c14b', nameKey: 'meteorGold', price: 1400, slot: 'player' },
-  { id: '#d7f7ff', nameKey: 'meteorIce', price: 1400, slot: 'player' },
-  { id: '#7c5cff', nameKey: 'meteorVoid', price: 3600, slot: 'player', offer: 'either', ads: 5 },
-  { id: '#c6ff00', nameKey: 'meteorToxic', price: 3600, slot: 'player', offer: 'either', ads: 5 },
-  { id: 'prism', nameKey: 'meteorPrism', price: 8000, slot: 'player', offer: 'either', ads: 10 },
-  { id: 'shift', nameKey: 'meteorShift', price: 5400, slot: 'player', offer: 'either', ads: 5 },
-  { id: 'aurora', nameKey: 'meteorAurora', price: 7200, slot: 'player', offer: 'either', ads: 10 },
-];
-
-const TRAIL_LOOKS = [
-  { id: 'classic', nameKey: 'trailClassic', price: 0, slot: 'trail' },
-  { id: '#f0c14b', nameKey: 'trailGold', price: 1100, slot: 'trail' },
-  { id: '#d7f7ff', nameKey: 'trailIce', price: 1100, slot: 'trail' },
-  { id: 'prism', nameKey: 'trailPrism', price: 5400, slot: 'trail', offer: 'either', ads: 10 },
-  { id: 'shift', nameKey: 'trailShift', price: 4000, slot: 'trail', offer: 'either', ads: 5 },
-];
+/** Runner cape colors mirror the double color catalog (same ids, prices, offers). */
+const PLAYER_BODIES = COLORS.map((item) => ({
+  id: item.id,
+  nameKey: item.nameKey,
+  price: item.price,
+  slot: 'player',
+  ...(item.offer ? { offer: item.offer } : {}),
+  ...(item.ads ? { ads: item.ads } : {}),
+}));
 
 const COIN_PACKS = [
   { id: 'gold', nameKey: 'packGold', price: 0, slot: 'coins' },
@@ -154,7 +143,7 @@ const COIN_PACKS = [
   { id: 'nova', nameKey: 'packNova', price: 26000, slot: 'coins' },
 ];
 
-const SHOP = { color: COLORS, hat: HATS, glasses: GLASSES, player: PLAYER_BODIES, trail: TRAIL_LOOKS, coins: COIN_PACKS };
+const SHOP = { color: COLORS, player: PLAYER_BODIES, coins: COIN_PACKS };
 const FLAG_IDS = FLAGS.map((flag) => flag.id);
 const POWERS = [
   { id: 'missile', slot: 'power', nameKey: 'powerMissile', detailKey: 'powerMissileDetail', price: 780 },
@@ -168,8 +157,8 @@ function dayStamp() {
 }
 
 const DEAL_BY_SUBJECT = {
-  echo: ['color', 'hat', 'glasses'],
-  player: ['player', 'trail'],
+  echo: ['color'],
+  player: ['player'],
   coins: ['coins'],
 };
 
@@ -380,11 +369,9 @@ let echoColor = COLORS[0].id;
 let unlockedColors = [COLORS[0].id];
 let ghostFlag = '';
 let unlockedFlags = [];
-let playerBody = 'classic';
-let playerTrail = 'classic';
+let playerBody = COLORS[0].id;
 let playerFlag = '';
-let unlockedBodies = ['classic'];
-let unlockedTrails = ['classic'];
+let unlockedBodies = [COLORS[0].id];
 let adProgress = {};
 let coinPack = 'gold';
 let unlockedPacks = ['gold'];
@@ -657,16 +644,20 @@ function loadSave() {
   unlockedColors = color.unlocked;
   echoColor = color.active;
   unlockedHats = hat.unlocked;
-  echoHat = hat.active;
   unlockedGlasses = glasses.unlocked;
-  echoGlasses = glasses.active;
   unlockedFlags = sanitizeIdList(safeJson(storageGet(STORAGE.flags), []), FLAG_IDS);
   ghostFlag = unlockedFlags.includes(storageGet(STORAGE.ghostFlag)) ? storageGet(STORAGE.ghostFlag) : '';
-  unlockedBodies = sanitizeUnlocks(safeJson(storageGet(STORAGE.meteors), ['classic']), PLAYER_BODIES.map((item) => item.id));
-  unlockedTrails = sanitizeUnlocks(safeJson(storageGet(STORAGE.trails), ['classic']), TRAIL_LOOKS.map((item) => item.id));
-  playerBody = unlockedBodies.includes(storageGet(STORAGE.meteorBody)) ? storageGet(STORAGE.meteorBody) : 'classic';
-  playerTrail = unlockedTrails.includes(storageGet(STORAGE.meteorTrail)) ? storageGet(STORAGE.meteorTrail) : 'classic';
+  unlockedBodies = sanitizeUnlocks(
+    safeJson(storageGet(STORAGE.meteors), [COLORS[0].id]),
+    PLAYER_BODIES.map((item) => item.id),
+  );
+  playerBody = unlockedBodies.includes(storageGet(STORAGE.meteorBody))
+    ? storageGet(STORAGE.meteorBody)
+    : COLORS[0].id;
   playerFlag = unlockedFlags.includes(storageGet(STORAGE.meteorFlag)) ? storageGet(STORAGE.meteorFlag) : '';
+  // Accessories retired from the shop — always bare heads.
+  echoHat = 'none';
+  echoGlasses = 'none';
   unlockedPacks = sanitizeUnlocks(safeJson(storageGet(STORAGE.coinPacks), ['gold']), COIN_PACKS.map((item) => item.id));
   coinPack = unlockedPacks.includes(storageGet(STORAGE.coinPack)) ? storageGet(STORAGE.coinPack) : 'gold';
   adProgress = safeJson(storageGet(STORAGE.adProgress), {});
@@ -694,9 +685,7 @@ function saveAll() {
   storageSet(STORAGE.flags, JSON.stringify(unlockedFlags));
   storageSet(STORAGE.ghostFlag, ghostFlag);
   storageSet(STORAGE.meteors, JSON.stringify(unlockedBodies));
-  storageSet(STORAGE.trails, JSON.stringify(unlockedTrails));
   storageSet(STORAGE.meteorBody, playerBody);
-  storageSet(STORAGE.meteorTrail, playerTrail);
   storageSet(STORAGE.meteorFlag, playerFlag);
   storageSet(STORAGE.coinPacks, JSON.stringify(unlockedPacks));
   storageSet(STORAGE.coinPack, coinPack);
@@ -717,8 +706,8 @@ function applyLoadout(next) {
   unlockedHats = next.unlocked.hat;
   unlockedGlasses = next.unlocked.glasses;
   echoColor = next.active.color;
-  echoHat = next.active.hat;
-  echoGlasses = next.active.glasses;
+  echoHat = 'none';
+  echoGlasses = 'none';
 }
 
 function resizeCanvas() {
@@ -841,20 +830,20 @@ function catalogItem(slot, id) {
 function trySlots() {
   if (previewSubject === 'coins') return ['coins'];
   if (previewSubject === 'powers') return [];
-  if (previewSubject === 'player') return ['playerFlag', 'trail', 'player'];
-  return ['echoFlag', 'glasses', 'hat', 'color'];
+  if (previewSubject === 'player') return ['playerFlag', 'player'];
+  return ['echoFlag', 'color'];
 }
 
 function subjectForSlot(slot) {
-  if (slot === 'player' || slot === 'trail' || slot === 'playerFlag') return 'player';
+  if (slot === 'player' || slot === 'playerFlag') return 'player';
   if (slot === 'coins') return 'coins';
   if (slot === 'power') return 'powers';
   return 'echo';
 }
 
 function slotAsleep(slot) {
-  if (slot === 'player' || slot === 'trail') {
-    if (hoverTry?.slot === 'player' || hoverTry?.slot === 'trail' || pinnedTry.player || pinnedTry.trail) return false;
+  if (slot === 'player') {
+    if (hoverTry?.slot === 'player' || pinnedTry.player) return false;
     return Boolean(previewChoice('playerFlag', playerFlag));
   }
   if (slot === 'color') {
@@ -873,7 +862,6 @@ function ownsItem(item) {
   if (isFlagSlot(item.slot)) return unlockedFlags.includes(item.id);
   if (item.slot === 'player') return unlockedBodies.includes(item.id);
   if (item.slot === 'coins') return unlockedPacks.includes(item.id);
-  if (item.slot === 'trail') return unlockedTrails.includes(item.id);
   return cosmeticLoadout().unlocked[item.slot]?.includes(item.id);
 }
 
@@ -882,7 +870,6 @@ function isEquipped(item) {
   if (item.slot === 'playerFlag') return playerFlag === item.id;
   if (item.slot === 'player') return !playerFlag && playerBody === item.id;
   if (item.slot === 'coins') return coinPack === item.id;
-  if (item.slot === 'trail') return !playerFlag && playerTrail === item.id;
   if (item.slot === 'color') return !ghostFlag && cosmeticLoadout().active.color === item.id;
   return cosmeticLoadout().active[item.slot] === item.id;
 }
@@ -928,9 +915,8 @@ function pinTry(item) {
   const home = subjectForSlot(item.slot);
   if (home !== previewSubject) previewSubject = home;
   const rivals = {
-    playerFlag: ['player', 'trail'],
+    playerFlag: ['player'],
     player: ['playerFlag'],
-    trail: ['playerFlag'],
     echoFlag: ['color'],
     color: ['echoFlag'],
   };
@@ -1204,12 +1190,9 @@ function renderShop() {
   if (previewSubject === 'echo') {
     renderFlagGrid('echo-flag-shop', 'echoFlag');
     renderSlot('color-shop', 'color');
-    renderSlot('hat-shop', 'hat');
-    renderSlot('glasses-shop', 'glasses');
   } else if (previewSubject === 'player') {
     renderFlagGrid('player-flag-shop', 'playerFlag');
     renderSlot('player-shop-grid', 'player');
-    renderSlot('trail-shop', 'trail');
   } else if (previewSubject === 'coins') {
     renderSlot('coin-shop', 'coins');
   } else {
@@ -1252,7 +1235,7 @@ function makeShopButton(item) {
 
   if (isFlagSlot(slot) && item.flag) button.append(flagThumb(item.flag));
   else if (slot === 'coins') button.append(makeCoinThumb(item.id));
-  else if (slot === 'color' || slot === 'player' || slot === 'trail') {
+  else if (slot === 'color' || slot === 'player') {
     const swatch = document.createElement('span');
     swatch.className = 'swatch';
     swatch.style.background = swatchBackground(item.id);
@@ -1326,20 +1309,7 @@ function paintLoadoutPreview(preview) {
     if (previewSubject === 'player') {
       const style = previewPlayerStyle();
       const now = performance.now();
-      const ballX = width * 0.72;
-      const ballY = height * 0.52;
-      const fistPath = [];
-      for (let i = 0; i < 9; i += 1) {
-        const along = i / 8;
-        fistPath.push({
-          x: 18 + (ballX - 18) * along,
-          y: ballY + Math.sin(now / 200 - along * 3) * 6 * (1 - along),
-          t: roundFrame,
-        });
-      }
-      // Ribbon under the cape, then the body on top.
-      drawFireTrail(bodyTrailFromPath(fistPath, 26, 0), style);
-      drawFireball(ballX, ballY, 26, now / 90, 1, 0, style, 1.1);
+      drawFireball(width * 0.72, height * 0.52, 26, now / 90, 1, 0, style, 1.1);
       return;
     }
     if (previewSubject === 'coins') {
@@ -1369,8 +1339,6 @@ function paintLoadoutPreview(preview) {
       wind: 1.1,
       hollow: true,
       aura: false,
-      hat: look.hat,
-      glasses: look.glasses,
       flagId,
     });
   });
@@ -1831,10 +1799,6 @@ function rememberUnlock(item) {
     if (!unlockedBodies.includes(item.id)) unlockedBodies = [...unlockedBodies, item.id];
     return;
   }
-  if (item.slot === 'trail') {
-    if (!unlockedTrails.includes(item.id)) unlockedTrails = [...unlockedTrails, item.id];
-    return;
-  }
   if (item.slot === 'coins') {
     if (!unlockedPacks.includes(item.id)) unlockedPacks = [...unlockedPacks, item.id];
     return;
@@ -1857,11 +1821,6 @@ function equipOwned(item) {
   }
   if (item.slot === 'player') {
     playerBody = item.id;
-    playerFlag = '';
-    return;
-  }
-  if (item.slot === 'trail') {
-    playerTrail = item.id;
     playerFlag = '';
     return;
   }
@@ -1891,7 +1850,7 @@ function buyCosmetic(item) {
     renderShop();
     return true;
   }
-  if (item.slot === 'player' || item.slot === 'trail' || item.slot === 'coins') {
+  if (item.slot === 'player' || item.slot === 'coins') {
     const price = salePrice(item);
     if (coins < price) {
       AudioEngine.deny();
@@ -2054,17 +2013,12 @@ function goRate() {
 function claimRate() {
   if (!rateArmed || !rateSawLeave) return;
   rateArmed = false;
-  const item = catalogItem('hat', 'laurel');
-  rememberUnlock(item);
-  equipOwned(item);
-  clearTry(item);
+  coins += 500;
   saveAll();
   closeRatePrompt();
   AudioEngine.coin();
   showToast(t('rateThanks'));
-  if (!document.getElementById('shop-screen')?.classList.contains('hidden') || !document.getElementById('flag-screen')?.classList.contains('hidden')) {
-    renderShop();
-  }
+  syncHUD();
 }
 
 function noteRateLeave() {
@@ -2097,7 +2051,8 @@ function setPreviewSubject(next) {
 }
 
 function advanceRound() {
-  const next = sealPath(echoes, currentPath, currentRound);
+  const priorClock = echoClock(roundFrame, currentRound);
+  const next = sealPath(echoes, currentPath, currentRound, priorClock);
   echoes = next.echoes;
   currentPath = [];
   currentRound = next.round;
@@ -2417,7 +2372,7 @@ function update() {
     clearLesson();
     spawnShieldLesson();
   }
-  if (tutorialActive && tutorialStep === 'wrap' && tutorialStepFrames > 200) {
+  if (tutorialActive && tutorialStep === 'wrap' && tutorialStepFrames > 140) {
     finishTutorial();
     return;
   }
@@ -4208,19 +4163,31 @@ const echoFace = new WeakMap();
 
 function pathHeading(echo, clock) {
   const here = ghostPoint(echo, clock);
-  const next = ghostPoint(echo, clock + 0.5);
+  // Longer look-ahead damps twitchy turns; reject wrap jumps.
+  const next = ghostPoint(echo, clock + 2.2);
   if (!here || !next) return null;
   const dx = next.x - here.x;
   const dy = next.y - here.y;
-  if (dx * dx + dy * dy < 0.04 || dx * dx + dy * dy > 36 * 36) return null;
+  const span = dx * dx + dy * dy;
+  if (span < 1 || span > 28 * 28) return null;
   return Math.atan2(dy, dx);
 }
 
 function faceAlong(echo, clock) {
   const heading = pathHeading(echo, clock);
   if (heading == null) return echoFace.get(echo) ?? 0;
-  echoFace.set(echo, heading);
-  return heading;
+  const prev = echoFace.get(echo);
+  if (prev == null) {
+    echoFace.set(echo, heading);
+    return heading;
+  }
+  // Blend heading so the cape does not snap on every path kink.
+  let delta = heading - prev;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  const blended = prev + delta * 0.22;
+  echoFace.set(echo, blended);
+  return blended;
 }
 
 function drawAfterimages(echo, clock, color, hollow) {
@@ -4272,8 +4239,6 @@ function drawEchoes() {
       phase: performance.now() / 190 + index * 1.3,
       heading,
       hollow: true,
-      hat: echoHat,
-      glasses: echoGlasses,
     });
   });
 }
@@ -5027,29 +4992,17 @@ function fireHeading() {
 
 function drawPlayer() {
   const phase = performance.now() / 90;
-  // Skip the blink/loading-ring look during the tutorial — grace still protects.
-  const flickering = !tutorialActive && grace > 0 && Math.floor(grace / 4) % 2 === 0;
   const style = equippedPlayerStyle();
   const heading = fireHeading();
   const wind = Math.min(1.4, 0.45 + Math.hypot(player.vx, player.vy) * 0.18);
-  // Ribbon first so it starts under the cape.
-  if (currentPath.length > 1) {
-    drawFireTrail(bodyTrailFromPath(currentPath, 20, heading), style);
-  }
-  drawFireball(player.x, player.y, 20, phase, flickering ? 0.45 : 1, heading, style, wind);
+  // Grace still protects — no blink or loading ring.
+  drawFireball(player.x, player.y, 20, phase, 1, heading, style, wind);
 
-  if ((grace <= 0 || tutorialActive) && shieldLayers.length === 0) return;
+  if (shieldLayers.length === 0) return;
   const body = playerBodyHit();
   ctx.save();
   const spin = performance.now() / 260;
   ctx.lineWidth = 1.6;
-  if (grace > 0 && !tutorialActive) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
-    ctx.globalAlpha = 0.45;
-    ctx.beginPath();
-    ctx.arc(body.x, body.y, body.radius + 6, spin, spin + Math.PI * 1.35);
-    ctx.stroke();
-  }
   shieldLayers.forEach((layer, index) => {
     const radius = body.radius + 12 + index * 8;
     const start = spin + index * 0.7;
@@ -5151,25 +5104,25 @@ function trailPair(id) {
   return ['#fff6d0', id];
 }
 
-function playerStyle(bodyId, trailId, flagId) {
+function playerStyle(bodyId, flagId) {
   const flag = flagById(flagId);
   if (flag) return { flag, trail: flagTrail(flag), body: null };
+  const body = lookColor(bodyId, 0) || bodyId || COLORS[0].id;
   return {
     flag: null,
-    trail: trailPair(trailId),
-    body: !bodyId || bodyId === 'classic' ? null : lookColor(bodyId, 0),
+    trail: [body, body],
+    body,
   };
 }
 
 function equippedPlayerStyle() {
-  return playerStyle(playerBody, playerTrail, playerFlag);
+  return playerStyle(playerBody, playerFlag);
 }
 
 function previewPlayerStyle() {
-  const tryingLook = hoverTry?.slot === 'player' || hoverTry?.slot === 'trail' || pinnedTry.player || pinnedTry.trail;
+  const tryingLook = hoverTry?.slot === 'player' || pinnedTry.player;
   return playerStyle(
     previewChoice('player', playerBody),
-    previewChoice('trail', playerTrail),
     tryingLook ? '' : previewChoice('playerFlag', playerFlag),
   );
 }
@@ -5255,15 +5208,25 @@ function echoRouteTint(index) {
 
 /**
  * Short wake + lookahead along a sealed route — not the full scribble.
- * Distances are in path pixels; ghostPoint walks at GHOST_SPEED per clock tick.
+ * Stops at the loop reset so the teleport home never draws as a shortcut.
  */
-function echoGuideRibbon(echo, clock, behindPx = 70, aheadPx = 160, stepPx = 10) {
+function echoGuideRibbon(echo, clock, behindPx = 70, aheadPx = 230, stepPx = 10) {
   if (!echo?.length) return [];
   const points = [];
+  let prev = null;
   for (let dist = -behindPx; dist <= aheadPx; dist += stepPx) {
     const at = clock + dist / GHOST_SPEED;
     const point = ghostPoint(echo, at);
-    if (point) points.push({ x: point.x, y: point.y });
+    if (!point) continue;
+    if (prev) {
+      const jump = Math.hypot(point.x - prev.x, point.y - prev.y);
+      if (jump > stepPx * 3) {
+        if (dist <= 0) points.length = 0;
+        else break;
+      }
+    }
+    points.push({ x: point.x, y: point.y });
+    prev = point;
   }
   return points;
 }
@@ -5405,8 +5368,6 @@ function drawMenuBackdrop() {
     phase: time * 3,
     heading: Math.atan2(Math.cos(echoOrbit) * 36, -Math.sin(echoOrbit) * 86),
     hollow: true,
-    hat: echoHat,
-    glasses: echoGlasses,
   });
   drawFireball(
     cx + Math.cos(time) * 86,

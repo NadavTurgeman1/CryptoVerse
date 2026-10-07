@@ -59,6 +59,12 @@ test('a sealed echo is a snapshot, and the ghost loops with the round clock', ()
   assert.equal(sealed.echoes.length, 1);
   assert.deepEqual(ghostPoint(sealed.echoes[0], 0), { x: 1, y: 2 });
   assert.equal(ghostPoint([], 0), null);
+
+  // Carrying the prior clock keeps doubles mid-route after a round seal.
+  const kept = sealPath([], path, 1, 40);
+  const playback = roundPressure(2).playback;
+  assert.ok(Math.abs(kept.frame - (40 * 100) / playback) < 1e-9);
+  assert.ok(Math.abs(echoClock(kept.frame, 2) - 40) < 1e-9);
 });
 
 test('a ghost keeps one pace along the route and skips the time spent standing still', () => {
@@ -77,9 +83,9 @@ test('a ghost keeps one pace along the route and skips the time spent standing s
   const route = [{ x: 0, y: 0 }, { x: 500, y: 0 }];
   const traveled = (round) => ghostPoint(route, echoClock(20, round)).x;
   assert.ok(Math.abs(traveled(1) - 20 * GHOST_SPEED) < 1e-6);
-  assert.ok(traveled(3) > traveled(4));
-  assert.ok(traveled(4) > traveled(2));
-  assert.ok(traveled(5) > traveled(3));
+  assert.ok(traveled(4) > traveled(3));
+  assert.ok(traveled(3) > traveled(2));
+  assert.ok(traveled(5) > traveled(4));
 });
 
 test('ghosts arrive every other round and the newest one grows to two paths', () => {
@@ -112,8 +118,8 @@ test('ghosts arrive every other round and the newest one grows to two paths', ()
   assert.deepEqual(afterFour.echoes[1], [...third, ...fourth]);
   second[0].x = 90;
   assert.equal(afterFour.echoes[0][1].x, 2);
-  assert.equal(roundPressure(3).playback, 104);
-  assert.equal(roundPressure(4).playback, 103);
+  assert.ok(Math.abs(roundPressure(3).playback - 100.7) < 1e-9);
+  assert.ok(Math.abs(roundPressure(4).playback - 101.05) < 1e-9);
   assert.ok(roundPressure(5).playback > roundPressure(3).playback);
 });
 
@@ -245,23 +251,23 @@ test('a slide moves by the finger delta and does not jump to the finger', () => 
 
 test('later rounds speed the echoes up, shorten the grace, and pull coins into a cluster', () => {
   assert.deepEqual(roundPressure(1), { playback: 100, grace: 75, spacing: 78, reach: Infinity });
-  assert.deepEqual(roundPressure(2), { playback: 99, grace: 73, spacing: 77, reach: 312 });
-  assert.equal(roundPressure(8).playback, 111);
+  assert.deepEqual(roundPressure(2), { playback: 100.35, grace: 73, spacing: 77, reach: 312 });
+  assert.ok(Math.abs(roundPressure(8).playback - 102.45) < 1e-9);
   assert.equal(roundPressure(8).grace, 61);
   assert.equal(roundPressure(8).spacing, 71);
   assert.equal(roundPressure(8).reach, 264);
   const twelve = roundPressure(12);
-  assert.equal(twelve.playback, 119);
+  assert.ok(Math.abs(twelve.playback - 103.85) < 1e-9);
   assert.equal(twelve.grace, 53);
   assert.equal(twelve.spacing, 67);
   assert.equal(twelve.reach, 232);
-  assert.equal(roundPressure(16).playback, 127);
+  assert.ok(Math.abs(roundPressure(16).playback - 105.25) < 1e-9);
   assert.equal(roundPressure(22).grace, 40);
   assert.equal(roundPressure(22).reach, 170);
   assert.equal(roundPressure(24).spacing, 56);
   assert.equal(echoClock(0, 8), 0);
   assert.equal(echoClock(10, 1), 10);
-  assert.ok(Math.abs(echoClock(10, 6) - 10.7) < 1e-9);
+  assert.ok(Math.abs(echoClock(10, 6) - 10.175) < 1e-9);
   assert.equal(echoClock(-4, 6), 0);
 
   let n = 0;
