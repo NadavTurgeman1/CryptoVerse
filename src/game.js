@@ -5,10 +5,10 @@ import {
   clampInt,
   dropOldestEcho,
   echoClock,
+  GHOST_SPEED,
   ghostPoint,
   roundPressure,
   stepHoming,
-  hitsEcho,
   joystickVector,
   meteorVelocity,
   pickMeteorEnds,
@@ -405,8 +405,6 @@ let settings = { music: 0.7, sfx: 0.7, lang: 'en' };
 let shieldLayers = [];
 
 const player = { x: 240, y: 400, radius: 14, targetX: 240, targetY: 400, vx: 0, vy: 0 };
-const FIREBALL_HIT = 24;
-const GHOST_HIT = 24;
 let echoes = [];
 let currentPath = [];
 let collectibles = [];
@@ -426,6 +424,7 @@ let tutorialActive = false;
 let tutorialWallet = 0;
 let tutorialStep = '';
 let tutorialStepFrames = 0;
+let tutorialAwaitMeteor = false;
 let recordNoted = false;
 let recordFlash = 0;
 let coinFlashes = [];
@@ -1326,15 +1325,21 @@ function paintLoadoutPreview(preview) {
   paintOn(g, () => {
     if (previewSubject === 'player') {
       const style = previewPlayerStyle();
-      const ballX = width * 0.66;
+      const now = performance.now();
+      const ballX = width * 0.72;
       const ballY = height * 0.52;
-      const ribbon = [];
-      for (let i = 0; i < 8; i += 1) {
-        const along = i / 7;
-        ribbon.push({ x: 16 + (ballX - 16) * along, y: ballY, t: roundFrame });
+      const fistPath = [];
+      for (let i = 0; i < 9; i += 1) {
+        const along = i / 8;
+        fistPath.push({
+          x: 18 + (ballX - 18) * along,
+          y: ballY + Math.sin(now / 200 - along * 3) * 6 * (1 - along),
+          t: roundFrame,
+        });
       }
-      drawFireTrail(ribbon, style);
-      drawFireball(ballX, ballY, 26, performance.now() / 90, 1, null, style);
+      // Ribbon under the cape, then the body on top.
+      drawFireTrail(bodyTrailFromPath(fistPath, 26, 0), style);
+      drawFireball(ballX, ballY, 26, now / 90, 1, 0, style, 1.1);
       return;
     }
     if (previewSubject === 'coins') {
@@ -1354,11 +1359,16 @@ function paintLoadoutPreview(preview) {
     );
     const tryingColor = hoverTry?.slot === 'color' || pinnedTry.color;
     const flagId = tryingColor ? '' : previewChoice('echoFlag', ghostFlag);
-    drawSpirit(width / 2, height * 0.56, {
-      color: flagId ? flagInk(flagById(flagId)) : look.color,
+    const now = performance.now();
+    // Fist is pinned at this point; shift right so the cape sits in the preview center.
+    drawSpirit(width * 0.72, height * 0.54, {
+      color: flagId ? flagInk(flagById(flagId)) : (lookColor(look.color, 0) || look.color),
       radius: 34,
-      phase: performance.now() / 180,
+      phase: now / 180,
+      heading: 0,
+      wind: 1.1,
       hollow: true,
+      aura: false,
       hat: look.hat,
       glasses: look.glasses,
       flagId,
@@ -1528,9 +1538,34 @@ function spawnMissileLesson() {
   powerups = [{ ...point, type: 'MISSILE' }];
 }
 
+/** Place visible doubles so the meteor wipe is obvious in the tutorial. */
+function seedTutorialEchoes(count = 2) {
+  const paths = [];
+  for (let i = 0; i < count; i += 1) {
+    const cx = view.w * (0.3 + i * 0.34);
+    const cy = view.h * (0.3 + (i % 2) * 0.2);
+    const path = [];
+    for (let step = 0; step < 48; step += 1) {
+      const a = (step / 48) * Math.PI * 2;
+      path.push({
+        x: cx + Math.cos(a) * (42 + i * 8),
+        y: cy + Math.sin(a) * (24 + i * 4),
+      });
+    }
+    paths.push(path);
+  }
+  echoes = paths;
+}
+
 function spawnMeteorLesson() {
+  seedTutorialEchoes(2);
+  grace = Math.max(grace, 90);
   showLesson('meteor', 'tutorialBannerMeteor');
   spawnMeteor(TUTORIAL_METEOR_FRAMES);
+}
+
+function beginTutorialWrapUp() {
+  showLesson('wrap', 'tutorialBannerMeteorDone');
 }
 
 function tutorialTravel() {
@@ -1561,7 +1596,12 @@ function advanceTutorialAfterPower(type) {
   }
   if (type === 'MISSILE' && tutorialStep === 'missile') {
     clearLesson();
-    spawnMeteorLesson();
+    // Wait for the missile to finish, then show doubles + meteor wipe.
+    tutorialAwaitMeteor = true;
+    if (!missile) {
+      tutorialAwaitMeteor = false;
+      spawnMeteorLesson();
+    }
   }
 }
 
@@ -1660,6 +1700,7 @@ function resetRun() {
   bannerTimer = 0;
   tutorialStep = '';
   tutorialStepFrames = 0;
+  tutorialAwaitMeteor = false;
   recordNoted = false;
   recordFlash = 0;
   coinFlashes = [];
@@ -2068,7 +2109,8 @@ function advanceRound() {
       finishTutorial();
       return;
     }
-    grace = Math.max(grace, 170);
+    // Invincibility only when the next lesson needs it — avoids a post-coin blink ring.
+    grace = 0;
     beginTutorialRound();
     AudioEngine.round();
     syncHUD();
@@ -2127,14 +2169,19 @@ function detonateMissile(x, y, hit) {
   shake = hit ? 9 : 3;
   burst(x, y, '#ff6a00');
   burst(x, y, '#fff1c2');
-  if (!hit) return;
-  const next = dropOldestEcho(echoes);
-  echoes = next.echoes;
-  addScore(200);
-  AudioEngine.blast();
-  buzz('missile');
-  showToast(t('echoDestroyed'));
-  announce(t('echoDestroyed'));
+  if (hit) {
+    const next = dropOldestEcho(echoes);
+    echoes = next.echoes;
+    addScore(200);
+    AudioEngine.blast();
+    buzz('missile');
+    showToast(t('echoDestroyed'));
+    announce(t('echoDestroyed'));
+  }
+  if (tutorialActive && tutorialAwaitMeteor) {
+    tutorialAwaitMeteor = false;
+    spawnMeteorLesson();
+  }
 }
 
 function stepMissile() {
@@ -2197,7 +2244,7 @@ function catchMeteor() {
   announce(t('meteorCatch'));
   if (tutorialActive && tutorialStep === 'meteor') {
     clearLesson();
-    spawnCoinLesson();
+    beginTutorialWrapUp();
   }
 }
 
@@ -2211,7 +2258,8 @@ function stepMeteor() {
   for (let i = 0; i < steps; i += 1) {
     meteor.x += meteor.vx / steps;
     meteor.y += meteor.vy / steps;
-    if (Math.hypot(meteor.x - player.x, meteor.y - player.y) < player.radius + 18) {
+    const body = playerBodyHit();
+    if (Math.hypot(meteor.x - body.x, meteor.y - body.y) < body.radius + 18) {
       catchMeteor();
       return;
     }
@@ -2237,11 +2285,12 @@ function stepMeteor() {
 
 function collectCoins() {
   if (tutorialActive && tutorialStep !== 'coins') return;
+  const body = playerBodyHit();
   const hit = takeOverlaps(
     collectibles,
-    player.x,
-    player.y,
-    (coin) => player.radius + coin.radius,
+    body.x,
+    body.y,
+    (coin) => body.radius + coin.radius,
   );
   if (!hit.taken.length) return;
 
@@ -2259,7 +2308,8 @@ function collectCoins() {
 
 function collectPowerups() {
   const available = tutorialActive ? powerups.filter((power) => lessonAllows(power.type)) : powerups;
-  const hit = takeOverlaps(available, player.x, player.y, (power) => player.radius + (power.type === 'COIN' ? 26 : 12));
+  const body = playerBodyHit();
+  const hit = takeOverlaps(available, body.x, body.y, (power) => body.radius + (power.type === 'COIN' ? 26 : 12));
   if (!hit.taken.length) return;
   const taken = new Set(hit.taken);
   powerups = powerups.filter((power) => !taken.has(power));
@@ -2289,6 +2339,14 @@ function movePlayer() {
     }
   }
 
+  if (isDragging) {
+    player.targetX = clampToField(player.targetX, player.radius, view.w - player.radius);
+    player.targetY = clampToField(player.targetY, player.radius, view.h - player.radius);
+    player.x = player.targetX;
+    player.y = player.targetY;
+    return;
+  }
+
   const previousX = player.x;
   const previousY = player.y;
   player.x += (player.targetX - player.x) * 0.2;
@@ -2299,6 +2357,9 @@ function movePlayer() {
   player.targetY = clampToField(player.targetY, player.radius, view.h - player.radius);
   player.vx = player.x - previousX;
   player.vy = player.y - previousY;
+  if (player.vx * player.vx + player.vy * player.vy >= 0.12) {
+    playerFace = Math.atan2(player.vy, player.vx);
+  }
 }
 
 function stepParticles() {
@@ -2356,9 +2417,13 @@ function update() {
     clearLesson();
     spawnShieldLesson();
   }
+  if (tutorialActive && tutorialStep === 'wrap' && tutorialStepFrames > 200) {
+    finishTutorial();
+    return;
+  }
 
   const readingLesson = tutorialActive && (bannerTimer > 0 || bannerQueue.length > 0);
-  if (!readingLesson && grace <= 0 && hitsEcho(player, echoes, ghostFrame(), FIREBALL_HIT + GHOST_HIT, true)) {
+  if (!readingLesson && grace <= 0 && playerTouchesEcho()) {
     if (shieldLayers.length > 0) absorbShieldHit();
     else {
       gameOver();
@@ -2609,10 +2674,16 @@ function ensureStars() {
   starfield = { w: view.w, h: view.h, dpr: view.dpr, points, galaxies, nebulae, comets };
 }
 
-function drawNebulae(now) {
+function drawNebulae(now, scroll = 0, driftX = 0, driftY = 0) {
   for (const cloud of starfield.nebulae) {
-    const x = cloud.x + Math.sin(now * 0.045 + cloud.phase) * cloud.drift;
-    const y = cloud.y + Math.cos(now * 0.037 + cloud.phase) * cloud.drift * 0.55;
+    const x = wrapField(
+      cloud.x + Math.sin(now * 0.045 + cloud.phase) * cloud.drift + scroll * driftX * 0.22,
+      view.w,
+    );
+    const y = wrapField(
+      cloud.y + Math.cos(now * 0.037 + cloud.phase) * cloud.drift * 0.55 + scroll * driftY * 0.22,
+      view.h,
+    );
     const glow = ctx.createRadialGradient(x, y, 0, x, y, cloud.r);
     glow.addColorStop(0, `rgba(${cloud.color}, 0.16)`);
     glow.addColorStop(0.42, `rgba(${cloud.color}, 0.07)`);
@@ -2635,12 +2706,14 @@ function drawNebulae(now) {
   }
 }
 
-function drawGalaxies() {
+function drawGalaxies(scroll = 0, driftX = 0, driftY = 0) {
   for (const galaxy of starfield.galaxies) {
+    const x = wrapField(galaxy.x + scroll * driftX * 0.12, view.w);
+    const y = wrapField(galaxy.y + scroll * driftY * 0.12, view.h);
     ctx.drawImage(
       galaxy.image,
-      galaxy.x - galaxy.span,
-      galaxy.y - galaxy.span,
+      x - galaxy.span,
+      y - galaxy.span,
       galaxy.span * 2,
       galaxy.span * 2,
     );
@@ -2719,8 +2792,16 @@ function drawGrid() {
   ctx.restore();
 }
 
+function wrapField(value, size) {
+  return ((value % size) + size) % size;
+}
+
 function drawAtmosphere() {
   const now = performance.now() / 1000;
+  // Seamless space scroll — feels like flying through the field.
+  const scroll = now * 42;
+  const driftX = -1;
+  const driftY = 0.38;
   ctx.save();
   const drifts = [
     { x: 0.25, y: 0.3, color: '255, 40, 90', r: 0.55 },
@@ -2728,8 +2809,8 @@ function drawAtmosphere() {
     { x: 0.5, y: 0.85, color: '120, 40, 255', r: 0.36 },
   ];
   for (const drift of drifts) {
-    const x = (drift.x + Math.sin(now * 0.12 + drift.y) * 0.08) * view.w;
-    const y = (drift.y + Math.cos(now * 0.1 + drift.x) * 0.06) * view.h;
+    const x = wrapField((drift.x + Math.sin(now * 0.12 + drift.y) * 0.08) * view.w + scroll * driftX * 0.08, view.w);
+    const y = wrapField((drift.y + Math.cos(now * 0.1 + drift.x) * 0.06) * view.h + scroll * driftY * 0.08, view.h);
     const radius = Math.max(view.w, view.h) * drift.r;
     const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
     glow.addColorStop(0, `rgba(${drift.color}, 0.07)`);
@@ -2739,18 +2820,21 @@ function drawAtmosphere() {
   }
 
   ensureStars();
-  drawNebulae(now);
-  drawGalaxies();
+  drawNebulae(now, scroll, driftX, driftY);
+  drawGalaxies(scroll, driftX, driftY);
   for (const star of starfield.points) {
+    const depth = star.r < 0.8 ? 0.4 : star.r < 1.5 ? 0.85 : 1.35;
+    const x = wrapField(star.x + scroll * driftX * depth, view.w);
+    const y = wrapField(star.y + scroll * driftY * depth, view.h);
     if (star.r > 1.6) {
       const spark = 0.78 + Math.sin(now * 1.7 + star.phase) * 0.22;
-      drawTwinkle(star.x, star.y, star.r * spark, star.tint, star.phase);
+      drawTwinkle(x, y, star.r * spark, star.tint, star.phase);
       continue;
     }
     const twinkle = 0.62 + Math.sin(now * 1.4 + star.phase) * 0.32;
     ctx.fillStyle = `rgba(${star.tint}, ${twinkle})`;
     ctx.beginPath();
-    ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+    ctx.arc(x, y, star.r, 0, Math.PI * 2);
     ctx.fill();
   }
   drawComets(now);
@@ -2864,115 +2948,442 @@ function drawRibbon(points, color, width, alpha) {
   ctx.restore();
 }
 
-function paintLimb(x, y, width, height, rotation, fill, hollow) {
+function paintCapsule(x0, y0, x1, y1, width, fill, stroke) {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const length = Math.hypot(dx, dy) || 1;
   ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(rotation);
+  ctx.translate(x0, y0);
+  ctx.rotate(Math.atan2(dy, dx));
   ctx.beginPath();
-  if (typeof ctx.roundRect === 'function') ctx.roundRect(-width / 2, 0, width, height, width / 2);
-  else ctx.rect(-width / 2, 0, width, height);
+  ctx.arc(0, 0, width / 2, Math.PI / 2, -Math.PI / 2);
+  ctx.arc(length, 0, width / 2, -Math.PI / 2, Math.PI / 2);
+  ctx.closePath();
   ctx.fillStyle = fill;
   ctx.fill();
-  if (hollow) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.88)';
-    ctx.lineWidth = Math.max(1.1, width * 0.22);
+  if (stroke) {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = Math.max(1.05, width * 0.14);
     ctx.stroke();
   }
   ctx.restore();
 }
 
-/** The runner and the hollow double share one silhouette. Hats sit on this head. */
-function paintRunner(radius, phase, look) {
-  const r = radius;
-  const hollow = Boolean(look.hollow);
-  const cloth = look.cloth || '#ffb000';
-  const skin = look.skin || '#f6d7b8';
-  const step = Math.sin(phase * 0.34);
-  const limb = hollow ? 'rgba(255,255,255,0.16)' : cloth;
-  const arm = hollow ? 'rgba(255,255,255,0.16)' : skin;
-
-  ctx.fillStyle = hollow ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.28)';
+/** Tapered limb segment (upper arm, thigh, etc.). */
+function paintTaperedLimb(x0, y0, x1, y1, w0, w1, fill, stroke) {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = (-dy / len);
+  const ny = (dx / len);
   ctx.beginPath();
-  ctx.ellipse(0, r * 1.02, r * 0.46, r * 0.1, 0, 0, Math.PI * 2);
+  ctx.moveTo(x0 + nx * w0, y0 + ny * w0);
+  ctx.lineTo(x1 + nx * w1, y1 + ny * w1);
+  ctx.lineTo(x1 - nx * w1, y1 - ny * w1);
+  ctx.lineTo(x0 - nx * w0, y0 - ny * w0);
+  ctx.closePath();
+  ctx.fillStyle = fill;
   ctx.fill();
-
-  paintLimb(-r * 0.16, r * 0.28, r * 0.2, r * 0.62, -step * 0.65, limb, hollow);
-  paintLimb(r * 0.16, r * 0.28, r * 0.2, r * 0.62, step * 0.65, limb, hollow);
-  paintLimb(-r * 0.46, -r * 0.15, r * 0.14, r * 0.42, step * 0.75, arm, hollow);
-  paintLimb(r * 0.46, -r * 0.15, r * 0.14, r * 0.42, -step * 0.75, arm, hollow);
-
-  ctx.beginPath();
-  if (typeof ctx.roundRect === 'function') ctx.roundRect(-r * 0.34, -r * 0.22, r * 0.68, r * 0.58, r * 0.18);
-  else ctx.rect(-r * 0.34, -r * 0.22, r * 0.68, r * 0.58);
-  ctx.fillStyle = hollow ? hexAlpha(cloth, 0.2) : cloth;
-  ctx.fill();
-  if (!hollow) {
-    ctx.strokeStyle = 'rgba(20, 10, 4, 0.35)';
-    ctx.lineWidth = Math.max(1.2, r * 0.05);
+  if (stroke) {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = Math.max(1, (w0 + w1) * 0.12);
     ctx.stroke();
-  }
-  if (look.flag) {
-    ctx.save();
-    ctx.beginPath();
-    if (typeof ctx.roundRect === 'function') ctx.roundRect(-r * 0.34, -r * 0.22, r * 0.68, r * 0.58, r * 0.18);
-    else ctx.rect(-r * 0.34, -r * 0.22, r * 0.68, r * 0.58);
-    ctx.clip();
-    paintGhostFlag(ctx, r * 0.72, look.flag);
-    ctx.restore();
-  }
-  if (hollow) {
-    ctx.beginPath();
-    if (typeof ctx.roundRect === 'function') ctx.roundRect(-r * 0.34, -r * 0.22, r * 0.68, r * 0.58, r * 0.18);
-    else ctx.rect(-r * 0.34, -r * 0.22, r * 0.68, r * 0.58);
-    ctx.strokeStyle = 'rgba(255,255,255,0.88)';
-    ctx.lineWidth = Math.max(1.2, r * 0.06);
-    ctx.stroke();
-  }
-
-  const headY = -r * 0.72;
-  ctx.beginPath();
-  ctx.arc(0, headY, r * 0.5, 0, Math.PI * 2);
-  ctx.fillStyle = hollow ? 'rgba(255,255,255,0.14)' : skin;
-  ctx.fill();
-  if (!hollow) {
-    ctx.strokeStyle = 'rgba(20, 10, 4, 0.35)';
-    ctx.lineWidth = Math.max(1.2, r * 0.05);
-    ctx.stroke();
-  }
-  if (hollow) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-    ctx.lineWidth = Math.max(1.2, r * 0.06);
-    ctx.stroke();
-  }
-
-  const eyeY = -r * 0.68;
-  const eyeR = Math.max(2, r * 0.12);
-  const blink = Math.sin(phase * 0.35) > 0.97 ? 0.25 : 1;
-  ctx.fillStyle = hollow ? 'rgba(8, 10, 18, 0.92)' : '#f8fafc';
-  ctx.beginPath();
-  ctx.ellipse(-r * 0.16, eyeY, eyeR * 0.72, eyeR * blink, 0, 0, Math.PI * 2);
-  ctx.ellipse(r * 0.16, eyeY, eyeR * 0.72, eyeR * blink, 0, 0, Math.PI * 2);
-  ctx.fill();
-  if (!hollow) {
-    ctx.fillStyle = cloth;
-    ctx.beginPath();
-    ctx.arc(-r * 0.16, eyeY, eyeR * 0.28, 0, Math.PI * 2);
-    ctx.arc(r * 0.16, eyeY, eyeR * 0.28, 0, Math.PI * 2);
-    ctx.fill();
   }
 }
 
-function drawFireball(x, y, radius, phase, alpha, heading = null, style = null) {
+function paintJoint(x, y, radius, fill, stroke) {
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  if (stroke) {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = Math.max(1, radius * 0.35);
+    ctx.stroke();
+  }
+}
+
+/** Clenched fist at the flight tip — top-down rear view. */
+function paintFlightFist(x, y, angle, r, fill, stroke, hollow, sleeve) {
   ctx.save();
   ctx.translate(x, y);
+  ctx.rotate(angle);
+  const cuff = hollow ? 'rgba(255,255,255,0.85)' : (sleeve || fill);
+  const glove = hollow ? 'rgba(255,255,255,0.96)' : fill;
+  ctx.fillStyle = cuff;
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.12, 0, r * 0.1, r * 0.12, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (stroke) {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = Math.max(1, r * 0.04);
+    ctx.stroke();
+  }
+  ctx.fillStyle = glove;
+  ctx.beginPath();
+  ctx.ellipse(r * 0.02, 0, r * 0.16, r * 0.14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (stroke) {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = Math.max(1, r * 0.045);
+    ctx.stroke();
+  }
+  // Knuckles
+  ctx.fillStyle = hollow ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.12)';
+  for (const ky of [-0.08, -0.02, 0.04, 0.1]) {
+    ctx.beginPath();
+    ctx.ellipse(r * 0.1, ky * r, r * 0.035, r * 0.028, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * Top-down rear flight pose: local +x is forward (fist), cape & boot soles trail in −x.
+ * HEAD_LINE is the lateral center of the head (y).
+ */
+const HEAD_LINE = 0;
+const HEAD_X = 0.16;
+const FIST_X = 0.92;
+const FIST_Y = 0.28;
+const FLY_FORWARD = 0;
+
+/** Lighten a hex while keeping its hue — faded double, still color-readable. */
+function washHex(hex, amount) {
+  const t = Math.max(0, Math.min(1, amount));
+  const [r, g, b] = hexRgb(hex);
+  const mix = (c) => Math.round(c + (238 - c) * t);
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+}
+
+/** Cape silhouette — wide top-down sail that billows in the wind. */
+function traceCape(r, flutter) {
+  const f = flutter || {
+    w1: 0, w2: 0, w3: 0, stretch: r * 1.85, sway: 0, billow: 0, flap: 0,
+  };
+  const neckX = -r * 0.1;
+  const midX = -r * 0.85 + f.sway * 0.15;
+  const tipX = -f.stretch + f.sway * 0.35;
+  const neckW = r * 0.22;
+  // Opposite sides swell out of phase so the cloth reads as flying.
+  const midWTop = r * 0.68 + f.w1 * 0.55 + f.billow * 0.35;
+  const midWBot = r * 0.68 - f.w1 * 0.4 + f.billow * 0.25;
+  const tipWTop = r * 1.02 + f.w3 * 0.7 + f.flap * 0.45;
+  const tipWBot = r * 1.02 - f.w3 * 0.55 + f.flap * 0.3;
+  const hemJag = f.w2 * 0.55 + f.flap * 0.25;
+  ctx.beginPath();
+  ctx.moveTo(neckX, -neckW);
+  ctx.lineTo(neckX + r * 0.04, neckW);
+  ctx.quadraticCurveTo(midX + f.sway * 0.1, midWBot + f.w2 * 0.2, tipX + r * 0.12, tipWBot);
+  // Jagged hem flutters point-by-point.
+  ctx.lineTo(tipX - r * 0.04 + f.w1 * 0.15, tipWBot * 0.4 + hemJag);
+  ctx.lineTo(tipX - r * 0.18 + f.flap * 0.2, f.w1 * 0.25 + f.sway * 0.2);
+  ctx.lineTo(tipX - r * 0.04 - f.w2 * 0.12, -tipWTop * 0.4 - hemJag * 0.85);
+  ctx.lineTo(tipX + r * 0.12, -tipWTop);
+  ctx.quadraticCurveTo(midX - f.sway * 0.08, -midWTop + f.w1 * 0.15, neckX, -neckW);
+  ctx.closePath();
+}
+
+function fistOffset(radius) {
+  return { x: FIST_X * radius, y: FIST_Y * radius };
+}
+
+/** World point of a local flight-space offset when the fist is pinned at `x, y`. */
+function flightWorld(x, y, radius, heading, localX, localY) {
+  const fist = fistOffset(radius);
+  const angle = (heading ?? 0) - FLY_FORWARD;
+  const dx = localX - fist.x;
+  const dy = localY - fist.y;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return {
+    x: x + cos * dx - sin * dy,
+    y: y + sin * dx + cos * dy,
+  };
+}
+
+/** Hit circle on the cape / upper back — not on the leading fist. */
+function bodyHit(x, y, radius, heading) {
+  const center = flightWorld(x, y, radius, heading, -radius * 0.55, HEAD_LINE * radius);
+  return { x: center.x, y: center.y, radius: radius * 0.78 };
+}
+
+function playerBodyHit() {
+  return bodyHit(player.x, player.y, 20, fireHeading());
+}
+
+/** Trail tip sits under the cape (mid-rear), so the ribbon emerges from beneath it. */
+function trailAnchor(x, y, radius, heading) {
+  return flightWorld(x, y, radius, heading, -radius * 1.05, HEAD_LINE * radius);
+}
+
+/**
+ * Rebuild the drawn trail from fist path points so each sample sits under the
+ * body for that heading — keeps the ribbon glued to the character.
+ */
+function bodyTrailFromPath(points, radius, tipHeading) {
+  if (points.length < 2) return points;
+  const out = [];
+  let heading = tipHeading ?? 0;
+  for (let i = 0; i < points.length; i += 1) {
+    if (i > 0) {
+      const dx = points[i].x - points[i - 1].x;
+      const dy = points[i].y - points[i - 1].y;
+      if (dx * dx + dy * dy >= 0.25) heading = Math.atan2(dy, dx);
+    } else if (points.length > 1) {
+      const dx = points[1].x - points[0].x;
+      const dy = points[1].y - points[0].y;
+      if (dx * dx + dy * dy >= 0.25) heading = Math.atan2(dy, dx);
+    }
+    const useHeading = i === points.length - 1 && tipHeading != null ? tipHeading : heading;
+    const hips = trailAnchor(points[i].x, points[i].y, radius, useHeading);
+    out.push({ x: hips.x, y: hips.y, t: points[i].t });
+  }
+  return out;
+}
+
+function echoBodyHit(ghost, heading) {
+  if (!ghost) return null;
+  return bodyHit(ghost.x, ghost.y, 17, heading ?? 0);
+}
+
+function playerTouchesEcho() {
+  const me = playerBodyHit();
+  const clock = ghostFrame();
+  for (const echo of echoes) {
+    const ghost = ghostPoint(echo, clock);
+    const other = echoBodyHit(ghost, faceAlong(echo, clock));
+    if (!other) continue;
+    if (Math.hypot(me.x - other.x, me.y - other.y) < me.radius + other.radius) return true;
+  }
+  return false;
+}
+
+/** Put the leading fist on `x, y` and turn the body behind it. */
+function placeFlight(x, y, radius, heading) {
+  const fist = fistOffset(radius);
+  ctx.translate(x, y);
+  ctx.rotate((heading ?? 0) - FLY_FORWARD);
+  ctx.translate(-fist.x, -fist.y);
+}
+
+/** Top-down rear silhouette shared by the runner and the hollow double. */
+function paintRunner(radius, phase, look) {
+  const r = radius;
+  const faded = Boolean(look.hollow);
+  // Suit/hair wash keeps doubles readable; cape keeps full shop/flag color.
+  const bodyWash = faded ? 0.55 : 0;
+  const cloth = look.cloth || '#ffb000';
+  const skin = '#f0d2b0';
+  const shade = look.shade || cloth;
+  const edge = faded ? 'rgba(70, 78, 96, 0.7)' : 'rgba(12, 16, 28, 0.55)';
+  const wind = Math.min(1.55, Math.max(0.55, look.wind ?? 1));
+  const headY = HEAD_LINE * r;
+  const headX = HEAD_X * r;
+  // Multi-frequency wind so the cape billows instead of sitting still.
+  const w1 = Math.sin(phase * 1.15) * r * 0.28 * wind;
+  const w2 = Math.sin(phase * 1.7 + 1.1) * r * 0.34 * wind;
+  const w3 = Math.sin(phase * 2.25 + 2.3) * r * 0.26 * wind;
+  const sway = Math.sin(phase * 0.85 + 0.4) * r * 0.22 * wind;
+  const billow = (0.55 + Math.sin(phase * 1.4 + 0.7) * 0.45) * r * 0.2 * wind;
+  const flap = Math.sin(phase * 2.8 + 1.6) * r * 0.2 * wind;
+  const stretch = r * (1.85 + wind * 0.35 + Math.sin(phase * 1.05) * 0.12 * wind);
+  const flutter = { w1, w2, w3, stretch, sway, billow, flap };
+  const capeCloth = cloth;
+  const [cr, cg, cb] = hexRgb(capeCloth);
+  const capeFill = (scale) =>
+    `rgb(${Math.round(cr * scale)}, ${Math.round(cg * scale)}, ${Math.round(cb * scale)})`;
+  // Soles follow flag / cape shade; hand color stays fixed.
+  const bootBase = look.flag ? flagInk(look.flag) : shade;
+  const bootFill = bootBase;
+  const suitFill = washHex('#cfd6e2', bodyWash);
+  const suitShade = washHex('#8b96a8', bodyWash);
+  const hair = washHex('#141824', bodyWash * 0.7);
+  const soleGap = r * 0.22;
+  const capeTipX = -flutter.stretch;
+  const fist = fistOffset(r);
+  const shoulderX = -r * 0.18;
+  const shoulderY = r * 0.4;
+  const elbowX = r * 0.4;
+  const elbowY = r * 0.38 + w1 * 0.04;
+
+  // 1) Legs start under the cape, then extend straight back to the soles.
+  const legRootX = capeTipX + r * 0.32;
+  const ankleX = capeTipX - r * 0.32;
+  const soleAt = ankleX - r * 0.1;
+  for (const side of [-1, 1]) {
+    const sy = side * soleGap + w1 * 0.06;
+    paintTaperedLimb(legRootX, sy, ankleX, sy, r * 0.085, r * 0.095, suitShade, edge);
+    paintJoint(ankleX + r * 0.02, sy, r * 0.07, suitFill, edge);
+    ctx.beginPath();
+    ctx.ellipse(soleAt, sy, r * 0.18, r * 0.13, 0, 0, Math.PI * 2);
+    ctx.fillStyle = bootFill;
+    ctx.fill();
+    ctx.strokeStyle = edge;
+    ctx.lineWidth = Math.max(1.25, r * 0.05);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    ctx.ellipse(soleAt - r * 0.02, sy, r * 0.09, r * 0.06, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+    ctx.lineWidth = Math.max(0.85, r * 0.032);
+    ctx.beginPath();
+    ctx.moveTo(soleAt - r * 0.09, sy - r * 0.045);
+    ctx.lineTo(soleAt + r * 0.07, sy - r * 0.045);
+    ctx.moveTo(soleAt - r * 0.09, sy + r * 0.035);
+    ctx.lineTo(soleAt + r * 0.07, sy + r * 0.035);
+    ctx.stroke();
+  }
+
+  // 2) Arm starts under the cape side, reaches the fist.
+  paintTaperedLimb(shoulderX, shoulderY, elbowX, elbowY, r * 0.11, r * 0.095, suitFill, edge);
+  paintTaperedLimb(elbowX, elbowY, fist.x - r * 0.12, fist.y, r * 0.095, r * 0.085, suitFill, edge);
+  paintJoint(shoulderX, shoulderY, r * 0.1, suitShade, edge);
+
+  // 3) Cape on top — covers the limb roots so they read as coming from under it.
+  // Flag / shop color fully replaces the default orange — never leave a classic underlayer.
+  traceCape(r, flutter);
+  if (look.flag) {
+    ctx.fillStyle = flagInk(look.flag);
+    ctx.fill();
+    const capeMidX = (-r * 0.1 - flutter.stretch) * 0.5 - r * 0.22;
+    const flagR = r * 0.9;
+    ctx.save();
+    traceCape(r, flutter);
+    ctx.clip();
+    ctx.translate(capeMidX, headY);
+    ctx.translate(0, flagR * 0.45);
+    ctx.scale(1.55, 1.4);
+    paintGhostFlag(ctx, flagR, look.flag);
+    ctx.restore();
+  } else {
+    const cape = ctx.createLinearGradient(-r * 0.1, -r * 0.5, -flutter.stretch, r * 0.5);
+    cape.addColorStop(0, capeFill(1.05));
+    cape.addColorStop(0.45, capeFill(0.95));
+    cape.addColorStop(1, capeFill(0.78));
+    ctx.fillStyle = cape;
+    ctx.fill();
+    // Wind-driven fold lines that travel down the cape.
+    const [sr, sg, sb] = hexRgb(capeCloth);
+    ctx.strokeStyle = `rgba(${Math.round(sr * 0.45)}, ${Math.round(sg * 0.35)}, ${Math.round(sb * 0.3)}, 0.5)`;
+    ctx.lineWidth = Math.max(1, r * 0.04);
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.22, -r * 0.06 + w1 * 0.08);
+    ctx.quadraticCurveTo(
+      -r * 0.85 + sway * 0.2,
+      -r * 0.28 + w2 * 0.45,
+      -flutter.stretch + r * 0.22 + flap * 0.15,
+      -r * 0.55 + w3 * 0.35,
+    );
+    ctx.moveTo(-r * 0.24, r * 0.08 - w1 * 0.06);
+    ctx.quadraticCurveTo(
+      -r * 0.9 - sway * 0.15,
+      r * 0.32 + w1 * 0.35,
+      -flutter.stretch + r * 0.2 - flap * 0.1,
+      r * 0.58 + w2 * 0.25,
+    );
+    ctx.moveTo(-r * 0.35, w2 * 0.05);
+    ctx.quadraticCurveTo(
+      -r * 1.05 + sway * 0.1,
+      billow * 0.4,
+      -flutter.stretch + r * 0.15,
+      flap * 0.3,
+    );
+    ctx.stroke();
+  }
+
+  traceCape(r, flutter);
+  ctx.strokeStyle = edge;
+  ctx.lineWidth = Math.max(1.35, r * 0.055);
+  ctx.stroke();
+
+  // 4) Shoulders / upper back (suit).
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.05, -r * 0.32);
+  ctx.quadraticCurveTo(r * 0.08, 0, -r * 0.05, r * 0.32);
+  ctx.quadraticCurveTo(-r * 0.28, r * 0.18, -r * 0.3, 0);
+  ctx.quadraticCurveTo(-r * 0.28, -r * 0.18, -r * 0.05, -r * 0.32);
+  ctx.closePath();
+  const suit = ctx.createLinearGradient(-r * 0.3, 0, r * 0.05, 0);
+  suit.addColorStop(0, suitShade);
+  suit.addColorStop(1, suitFill);
+  ctx.fillStyle = suit;
+  ctx.fill();
+  ctx.strokeStyle = edge;
+  ctx.lineWidth = Math.max(1.1, r * 0.04);
+  ctx.stroke();
+
+  // 5) Back of head with hair texture (reads as scalp, not a ball).
+  ctx.beginPath();
+  ctx.arc(headX, headY, r * 0.34, 0, Math.PI * 2);
+  const scalp = ctx.createRadialGradient(headX - r * 0.06, headY, r * 0.02, headX, headY, r * 0.36);
+  scalp.addColorStop(0, washHex('#2a3144', bodyWash));
+  scalp.addColorStop(0.45, hair);
+  scalp.addColorStop(1, washHex('#0a0c12', bodyWash * 0.45));
+  ctx.fillStyle = scalp;
+  ctx.fill();
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(headX, headY, r * 0.34, 0, Math.PI * 2);
+  ctx.clip();
+  // Layered strands from a crown part — classic back-of-head look.
+  const strand = faded ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.16)';
+  const shadeStrand = faded ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.38)';
+  ctx.lineCap = 'round';
+  for (let i = -5; i <= 5; i += 1) {
+    const a = (i / 5) * 1.15;
+    const ox = Math.cos(a) * r * 0.02;
+    const oy = Math.sin(a) * r * 0.02;
+    ctx.strokeStyle = i % 2 === 0 ? shadeStrand : strand;
+    ctx.lineWidth = Math.max(0.9, r * (0.028 + (Math.abs(i) % 3) * 0.006));
+    ctx.beginPath();
+    ctx.moveTo(headX + ox, headY + oy);
+    ctx.quadraticCurveTo(
+      headX - r * 0.06 + oy * 0.8,
+      headY + Math.sin(a) * r * 0.18,
+      headX - r * 0.28 + Math.cos(a) * r * 0.08,
+      headY + Math.sin(a) * r * 0.28,
+    );
+    ctx.stroke();
+  }
+  // Crown swirl / cowlick
+  ctx.strokeStyle = shadeStrand;
+  ctx.lineWidth = Math.max(1, r * 0.04);
+  ctx.beginPath();
+  ctx.arc(headX + r * 0.02, headY - r * 0.02, r * 0.1, -0.4, 2.4);
+  ctx.stroke();
+  ctx.strokeStyle = strand;
+  ctx.lineWidth = Math.max(0.8, r * 0.03);
+  ctx.beginPath();
+  ctx.arc(headX, headY + r * 0.02, r * 0.16, 0.6, 2.8);
+  ctx.stroke();
+  ctx.restore();
+  ctx.beginPath();
+  ctx.arc(headX, headY, r * 0.34, 0, Math.PI * 2);
+  ctx.strokeStyle = edge;
+  ctx.lineWidth = Math.max(1.2, r * 0.05);
+  ctx.stroke();
+
+  // 6) Fist on top — fixed hand color (not skin/flag).
+  paintFlightFist(fist.x, fist.y, 0, r, skin, edge, false, suitFill);
+}
+
+function drawFireball(x, y, radius, phase, alpha, heading = null, style = null, wind = 1) {
+  ctx.save();
   ctx.globalAlpha = alpha;
-  if (heading != null) ctx.rotate(Math.cos(heading) * 0.28);
+  placeFlight(x, y, radius, heading);
   const palette = firePalette(style);
+  // Prefer shop body color for the cape; trail cool is only the classic/fallback shade.
+  const cloth = style?.body || palette.body[2];
+  const shade = style?.body || palette.body[3];
   paintRunner(radius, phase, {
     hollow: false,
-    cloth: palette.body[2],
+    cloth,
     skin: palette.body[1],
+    shade,
     flag: palette.flag,
+    wind,
   });
   ctx.restore();
 }
@@ -3745,23 +4156,19 @@ function drawSpirit(x, y, options) {
   const color = options.color ?? '#00f0ff';
   const alpha = options.alpha ?? 1;
   const phase = options.phase ?? 0;
-  const lean = options.lean ?? 0;
   const hollow = options.hollow ?? false;
   const aura = options.aura !== false;
-  const bob = Math.sin(phase) * 1.4;
-
   ctx.save();
-  ctx.translate(x, y + bob);
-  ctx.rotate(lean);
   ctx.globalAlpha = alpha;
+  placeFlight(x, y, radius, options.heading);
 
   if (aura) {
-    const haze = ctx.createRadialGradient(0, -radius * 0.2, radius * 0.2, 0, 0, radius * 2.2);
-    haze.addColorStop(0, hexAlpha(color, hollow ? 0.28 : 0.4));
+    const haze = ctx.createRadialGradient(-radius * 0.5, 0, radius * 0.15, -radius * 0.7, 0, radius * 1.25);
+    haze.addColorStop(0, hexAlpha(color, hollow ? 0.14 : 0.2));
     haze.addColorStop(1, hexAlpha(color, 0));
     ctx.fillStyle = haze;
     ctx.beginPath();
-    ctx.arc(0, 0, radius * 2.2, 0, Math.PI * 2);
+    ctx.ellipse(-radius * 0.65, 0, radius * 1.15, radius * 0.85, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -3769,20 +4176,58 @@ function drawSpirit(x, y, options) {
   paintRunner(radius, phase, {
     hollow,
     cloth: color,
-    skin: hollow ? '#f8fafc' : '#f6d7b8',
+    skin: '#f0d2b0',
+    shade: color,
     flag,
+    wind: options.wind ?? 1,
   });
 
-  if (options.glasses && options.glasses !== 'none') drawGlasses(options.glasses, radius);
-  if (options.hat && options.hat !== 'none') drawHat(options.hat, radius, color);
+  // Hats sit on the back-of-head from the top-down view.
+  if (options.hat && options.hat !== 'none') {
+    ctx.save();
+    ctx.translate(HEAD_X * radius, HEAD_LINE * radius);
+    ctx.scale(0.62, 0.62);
+    if (hollow) ctx.globalAlpha *= 0.72;
+    drawHat(options.hat, radius, color);
+    ctx.restore();
+  }
+  // Glasses read as a thin band across the back of the head.
+  if (options.glasses && options.glasses !== 'none') {
+    ctx.save();
+    ctx.translate(HEAD_X * radius + radius * 0.06, HEAD_LINE * radius);
+    ctx.scale(0.5, 0.55);
+    if (hollow) ctx.globalAlpha *= 0.72;
+    drawGlasses(options.glasses, radius);
+    ctx.restore();
+  }
 
   ctx.restore();
+}
+
+const echoFace = new WeakMap();
+
+function pathHeading(echo, clock) {
+  const here = ghostPoint(echo, clock);
+  const next = ghostPoint(echo, clock + 0.5);
+  if (!here || !next) return null;
+  const dx = next.x - here.x;
+  const dy = next.y - here.y;
+  if (dx * dx + dy * dy < 0.04 || dx * dx + dy * dy > 36 * 36) return null;
+  return Math.atan2(dy, dx);
+}
+
+function faceAlong(echo, clock) {
+  const heading = pathHeading(echo, clock);
+  if (heading == null) return echoFace.get(echo) ?? 0;
+  echoFace.set(echo, heading);
+  return heading;
 }
 
 function drawAfterimages(echo, clock, color, hollow) {
   const count = hollow ? 4 : 6;
   for (let step = count; step >= 1; step -= 1) {
-    const point = ghostPoint(echo, clock - step * 2);
+    const at = clock - step * 2;
+    const point = ghostPoint(echo, at);
     if (!point) continue;
     const fade = 1 - step / (count + 1);
     drawSpirit(point.x, point.y, {
@@ -3791,7 +4236,7 @@ function drawAfterimages(echo, clock, color, hollow) {
       radius: hollow ? 10 + fade * 4 : 9 + fade * 5,
       alpha: fade * (hollow ? 0.22 : 0.28),
       phase: performance.now() / 220 - step,
-      lean: 0,
+      heading: pathHeading(echo, at) ?? faceAlong(echo, clock),
       hollow,
       aura: false,
     });
@@ -3800,26 +4245,32 @@ function drawAfterimages(echo, clock, color, hollow) {
 
 function drawEchoes() {
   echoes.forEach((echo, index) => {
-    const alpha = 0.55 + ((index + 1) / echoes.length) * 0.4;
-    drawLitRibbon(echo, wornEchoColor(), 2.3, Math.min(1, alpha));
+    if (!echo.length) return;
+    const clock = ghostFrame();
+    const guide = echoGuideRibbon(echo, clock);
+    if (guide.length >= 2) {
+      const alpha = 0.5 + ((index + 1) / echoes.length) * 0.45;
+      drawLitRibbon(guide, echoRouteTint(index), 2.6, Math.min(1, alpha));
+    }
   });
 
   echoes.forEach((echo, index) => {
     if (!echo.length) return;
     const clock = ghostFrame();
     const ghost = ghostPoint(echo, clock);
-    const previous = ghostPoint(echo, clock - 1) ?? ghost;
-    const lean = clamp(ghost.x - previous.x, -8, 8) / 8 * 0.55;
+    if (!ghost) return;
+    const heading = faceAlong(echo, clock);
     const newest = index === echoes.length - 1;
     const near = proximity(ghost.x, ghost.y);
-    drawAfterimages(echo, clock, wornEchoColor(), true);
+    const cape = wornEchoColor();
+    drawAfterimages(echo, clock, cape, true);
     drawSpirit(ghost.x, ghost.y, {
-      color: wornEchoColor(),
+      color: cape,
       flagId: ghostFlag,
       radius: 17,
-      alpha: Math.min(1, (newest ? 0.78 : 0.56) + near * 0.28),
+      alpha: Math.min(1, (newest ? 0.98 : 0.92) + near * 0.06),
       phase: performance.now() / 190 + index * 1.3,
-      lean,
+      heading,
       hollow: true,
       hat: echoHat,
       glasses: echoGlasses,
@@ -4149,13 +4600,14 @@ function drawGlow(x, y, radius, color, peak) {
 
 function drawSceneLights() {
   const style = equippedPlayerStyle();
+  const body = playerBodyHit();
   if (classicFire(style)) {
-    drawGlow(player.x, player.y, 230, '255, 150, 60', 0.62);
-    drawGlow(player.x, player.y, 70, '255, 230, 180', 0.5);
+    drawGlow(body.x, body.y, 230, '255, 150, 60', 0.62);
+    drawGlow(body.x, body.y, 70, '255, 230, 180', 0.5);
     return;
   }
-  drawGlow(player.x, player.y, 230, rgbCss(style.body || style.trail[1]), 0.62);
-  drawGlow(player.x, player.y, 70, rgbCss(style.body || style.trail[0]), 0.5);
+  drawGlow(body.x, body.y, 230, rgbCss(style.body || style.trail[1]), 0.62);
+  drawGlow(body.x, body.y, 70, rgbCss(style.body || style.trail[0]), 0.5);
 }
 
 function traceGem(cut, radius) {
@@ -4541,38 +4993,70 @@ function drawRecordFlash() {
   ctx.restore();
 }
 
+let playerFace = 0;
+
 function fireHeading() {
+  if (currentPath.length) {
+    const last = currentPath[currentPath.length - 1];
+    const liveDx = player.x - last.x;
+    const liveDy = player.y - last.y;
+    if (liveDx * liveDx + liveDy * liveDy >= 0.64) {
+      playerFace = Math.atan2(liveDy, liveDx);
+      return playerFace;
+    }
+  }
+  if (currentPath.length >= 2) {
+    const tip = currentPath[currentPath.length - 1];
+    let i = currentPath.length - 2;
+    let dist = Math.hypot(tip.x - currentPath[i].x, tip.y - currentPath[i].y);
+    while (i > 0 && dist < 16) {
+      i -= 1;
+      dist += Math.hypot(currentPath[i + 1].x - currentPath[i].x, currentPath[i + 1].y - currentPath[i].y);
+    }
+    const dx = tip.x - currentPath[i].x;
+    const dy = tip.y - currentPath[i].y;
+    if (dx * dx + dy * dy >= 2.25) {
+      playerFace = Math.atan2(dy, dx);
+      return playerFace;
+    }
+  }
   const speed = Math.hypot(player.vx, player.vy);
-  if (speed < 0.35) return -Math.PI / 2;
-  return Math.atan2(-player.vy, -player.vx);
+  if (speed >= 0.2) playerFace = Math.atan2(player.vy, player.vx);
+  return playerFace;
 }
 
 function drawPlayer() {
   const phase = performance.now() / 90;
-  const flickering = grace > 0 && Math.floor(grace / 4) % 2 === 0;
+  // Skip the blink/loading-ring look during the tutorial — grace still protects.
+  const flickering = !tutorialActive && grace > 0 && Math.floor(grace / 4) % 2 === 0;
   const style = equippedPlayerStyle();
-  if (currentPath.length > 1) drawFireTrail(currentPath, style);
-  const speed = Math.hypot(player.vx, player.vy);
-  drawFireball(player.x, player.y, 20, phase, flickering ? 0.45 : 1, speed < 0.35 ? null : fireHeading(), style);
+  const heading = fireHeading();
+  const wind = Math.min(1.4, 0.45 + Math.hypot(player.vx, player.vy) * 0.18);
+  // Ribbon first so it starts under the cape.
+  if (currentPath.length > 1) {
+    drawFireTrail(bodyTrailFromPath(currentPath, 20, heading), style);
+  }
+  drawFireball(player.x, player.y, 20, phase, flickering ? 0.45 : 1, heading, style, wind);
 
-  if (grace <= 0 && shieldLayers.length === 0) return;
+  if ((grace <= 0 || tutorialActive) && shieldLayers.length === 0) return;
+  const body = playerBodyHit();
   ctx.save();
   const spin = performance.now() / 260;
   ctx.lineWidth = 1.6;
-  if (grace > 0) {
+  if (grace > 0 && !tutorialActive) {
     ctx.strokeStyle = 'rgba(255,255,255,0.75)';
     ctx.globalAlpha = 0.45;
     ctx.beginPath();
-    ctx.arc(player.x, player.y, 24, spin, spin + Math.PI * 1.35);
+    ctx.arc(body.x, body.y, body.radius + 6, spin, spin + Math.PI * 1.35);
     ctx.stroke();
   }
   shieldLayers.forEach((layer, index) => {
-    const radius = 30 + index * 8;
+    const radius = body.radius + 12 + index * 8;
     const start = spin + index * 0.7;
     ctx.strokeStyle = layer.kind === 'lasting' ? '#d8fbff' : '#7af6ff';
     ctx.globalAlpha = layer.kind === 'lasting' ? 0.95 : 0.72;
     ctx.beginPath();
-    ctx.arc(player.x, player.y, radius, start, start + Math.PI * 1.45);
+    ctx.arc(body.x, body.y, radius, start, start + Math.PI * 1.45);
     ctx.stroke();
     for (let i = 0; i < 3; i += 1) {
       const angle = start + (i * Math.PI * 2) / 3;
@@ -4580,8 +5064,8 @@ function drawPlayer() {
       ctx.globalAlpha = 0.9;
       ctx.beginPath();
       ctx.arc(
-        player.x + Math.cos(angle) * radius,
-        player.y + Math.sin(angle) * (radius * 0.56),
+        body.x + Math.cos(angle) * radius,
+        body.y + Math.sin(angle) * (radius * 0.56),
         2.1,
         0,
         Math.PI * 2,
@@ -4723,9 +5207,9 @@ function classicPalette() {
     sparkCool: '#ff5a14',
     flag: null,
     ribbon: [
-      [7, 58, '255, 48, 0', 0.24],
-      [2.8, 26, '255, 122, 16', 0.78],
-      [1, 9, '255, 244, 210', 0.92],
+      [2.2, 16, '255, 48, 0', 0.22],
+      [1.1, 7, '255, 122, 16', 0.72],
+      [0.4, 2.4, '255, 244, 210', 0.9],
     ],
   };
 }
@@ -4735,13 +5219,13 @@ function firePalette(style) {
   if (!style || classicFire(style)) return classic;
   const hot = style.trail[0];
   const cool = style.trail[1];
-  const mid = style.body || cool;
+  // Cape cloth: shop body color, else flag ink, else trail — never keep classic orange under a skin.
+  const mid = style.body || (style.flag ? flagInk(style.flag) : cool);
   const ribbon = [
-    [7, 58, rgbCss(cool), 0.28],
-    [2.8, 26, rgbCss(mid), 0.78],
-    [1, 9, rgbCss(hot), 0.92],
+    [2.2, 16, rgbCss(cool), 0.22],
+    [1.1, 7, rgbCss(mid), 0.72],
+    [0.4, 2.4, rgbCss(hot), 0.9],
   ];
-  if (!style.body && !style.flag) return { ...classic, ribbon };
   return {
     heat: [rgbaHex(hot, 0.95), rgbaHex(mid, 0.55), rgbaHex(cool, 0.2), rgbaHex(cool, 0)],
     tongueHot: [rgbaHex(hot, 0.98), rgbaHex(mid, 0.9)],
@@ -4758,7 +5242,30 @@ function firePalette(style) {
 
 function wornEchoColor() {
   const flag = flagById(ghostFlag);
-  return flag ? flagInk(flag) : echoColor;
+  if (flag) return flagInk(flag);
+  return lookColor(echoColor, 0) || echoColor || '#ff2a55';
+}
+
+/** Distinct route tint per echo index so overlapping guides stay readable. */
+const ECHO_ROUTE_TINTS = ['#00f0ff', '#ff3dce', '#b6ff3b', '#ffbb00', '#b388ff', '#ff5a1f'];
+
+function echoRouteTint(index) {
+  return ECHO_ROUTE_TINTS[index % ECHO_ROUTE_TINTS.length];
+}
+
+/**
+ * Short wake + lookahead along a sealed route — not the full scribble.
+ * Distances are in path pixels; ghostPoint walks at GHOST_SPEED per clock tick.
+ */
+function echoGuideRibbon(echo, clock, behindPx = 70, aheadPx = 160, stepPx = 10) {
+  if (!echo?.length) return [];
+  const points = [];
+  for (let dist = -behindPx; dist <= aheadPx; dist += stepPx) {
+    const at = clock + dist / GHOST_SPEED;
+    const point = ghostPoint(echo, at);
+    if (point) points.push({ x: point.x, y: point.y });
+  }
+  return points;
 }
 
 function drawMeteorSprite(x, y, angle, scale, style) {
@@ -4890,11 +5397,13 @@ function drawMenuBackdrop() {
     2,
     0.35,
   );
-  drawSpirit(cx + Math.cos(time + 2.2) * 86, cy + Math.sin(time + 2.2) * 36, {
-    color: echoColor,
+  const echoOrbit = time + 2.2;
+  drawSpirit(cx + Math.cos(echoOrbit) * 86, cy + Math.sin(echoOrbit) * 36, {
+    color: wornEchoColor(),
+    flagId: ghostFlag,
     radius: 18,
     phase: time * 3,
-    lean: Math.cos(time) * 0.3,
+    heading: Math.atan2(Math.cos(echoOrbit) * 36, -Math.sin(echoOrbit) * 86),
     hollow: true,
     hat: echoHat,
     glasses: echoGlasses,
@@ -4905,7 +5414,7 @@ function drawMenuBackdrop() {
     18,
     time * 6,
     1,
-    Math.atan2(-Math.cos(time) * 36, Math.sin(time) * 86),
+    Math.atan2(Math.cos(time) * 36, -Math.sin(time) * 86),
   );
 }
 
@@ -5031,12 +5540,17 @@ function moveSlide(event) {
   if (!slide || event.pointerId !== slide.id || gameState !== 'PLAYING') return;
   const point = pointFromEvent(event);
   const next = slideBy(player.x, player.y, point.x - slide.x, point.y - slide.y, fieldLimits());
+  const dx = next.x - player.x;
+  const dy = next.y - player.y;
   slide.x = point.x;
   slide.y = point.y;
   player.x = next.x;
   player.y = next.y;
   player.targetX = next.x;
   player.targetY = next.y;
+  player.vx = dx;
+  player.vy = dy;
+  if (dx * dx + dy * dy >= 0.25) playerFace = Math.atan2(dy, dx);
 }
 
 function endSlide(event) {
