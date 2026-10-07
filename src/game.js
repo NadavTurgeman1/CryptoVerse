@@ -533,6 +533,7 @@ function saveSettings() {
 function applyLanguage() {
   const root = document.getElementById('game-container');
   document.documentElement.lang = settings.lang;
+  document.documentElement.dir = 'ltr';
   root.dataset.lang = settings.lang;
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     el.textContent = t(el.dataset.i18n);
