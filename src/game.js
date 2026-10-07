@@ -388,7 +388,7 @@ let bestRound = 0;
 let gamesPlayed = 0;
 let missileStock = 0;
 let shieldStock = 0;
-let settings = { music: 0.7, sfx: 0.7, lang: 'en' };
+let settings = { music: 0.7, sfx: 0.7, lang: 'en', control: 'touch' };
 let shieldLayers = [];
 
 const player = { x: 240, y: 400, radius: 14, targetX: 240, targetY: 400, vx: 0, vy: 0 };
@@ -507,8 +507,13 @@ function loadSettings() {
     music: savedLevel(saved.music, legacy),
     sfx: savedLevel(saved.sfx, saved.effects === false ? 0 : legacy),
     lang: isUiLang(saved.lang) ? saved.lang : 'en',
+    control: saved.control === 'joystick' ? 'joystick' : 'touch',
   };
   AudioEngine.apply(settings);
+}
+
+function usesJoystick() {
+  return settings.control === 'joystick';
 }
 
 function saveSettings() {
@@ -626,11 +631,13 @@ function syncSettingsForm() {
   const music = document.getElementById('set-music');
   const sfx = document.getElementById('set-sfx');
   const language = document.getElementById('set-language');
+  const joystickToggle = document.getElementById('set-joystick');
   const musicReadout = document.getElementById('music-readout');
   const sfxReadout = document.getElementById('sfx-readout');
   if (music) music.value = String(Math.round(settings.music * 100));
   if (sfx) sfx.value = String(Math.round(settings.sfx * 100));
   if (language) language.value = settings.lang;
+  if (joystickToggle) joystickToggle.checked = usesJoystick();
   if (musicReadout) musicReadout.textContent = String(Math.round(settings.music * 100));
   if (sfxReadout) sfxReadout.textContent = String(Math.round(settings.sfx * 100));
 }
@@ -2275,7 +2282,7 @@ function collectPowerups() {
 }
 
 function movePlayer() {
-  if (joystick.active && joystick.amount > JOYSTICK_DEADZONE) {
+  if (usesJoystick() && joystick.active && joystick.amount > JOYSTICK_DEADZONE) {
     const lead = (8 / 0.2) * joystick.amount;
     player.targetX = player.x + (joystick.x / joystick.amount) * lead;
     player.targetY = player.y + (joystick.y / joystick.amount) * lead;
@@ -5313,19 +5320,21 @@ function drawBanner() {
 }
 
 function drawJoystick() {
-  if (!joystick.active) return;
+  if (!usesJoystick() || !joystick.active) return;
   ctx.save();
   ctx.translate(joystick.ox, joystick.oy);
-  ctx.fillStyle = 'rgba(8, 12, 22, 0.42)';
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = 'rgba(8, 12, 22, 0.28)';
   ctx.beginPath();
   ctx.arc(0, 0, JOYSTICK_RADIUS, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.38)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
   ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.fillStyle = 'rgba(255, 148, 40, 0.95)';
-  ctx.strokeStyle = 'rgba(255, 236, 190, 0.9)';
-  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.72;
+  ctx.fillStyle = 'rgba(255, 148, 40, 0.7)';
+  ctx.strokeStyle = 'rgba(255, 236, 190, 0.55)';
+  ctx.lineWidth = 1.6;
   ctx.beginPath();
   ctx.arc(joystick.x * JOYSTICK_RADIUS, joystick.y * JOYSTICK_RADIUS, 22, 0, Math.PI * 2);
   ctx.fill();
@@ -5334,7 +5343,7 @@ function drawJoystick() {
 }
 
 function drawDragReticle() {
-  if (!isDragging || gameState !== 'PLAYING') return;
+  if (usesJoystick() || !isDragging || gameState !== 'PLAYING') return;
   ctx.save();
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
   ctx.lineWidth = 1.5;
@@ -5488,13 +5497,27 @@ function fieldLimits() {
 }
 
 function beginSlide(event) {
-  if (slide || gameState !== 'PLAYING') return;
+  if (slide || gameState !== 'PLAYING' || usesJoystick()) return;
   const point = pointFromEvent(event);
   slide = { id: event.pointerId, x: point.x, y: point.y };
   isDragging = true;
   player.targetX = player.x;
   player.targetY = player.y;
   try { canvas.setPointerCapture(event.pointerId); } catch { /* synthetic pointers */ }
+}
+
+function beginJoystick(event) {
+  if (!usesJoystick() || joystick.active || gameState !== 'PLAYING') return;
+  const point = pointFromEvent(event);
+  joystick.active = true;
+  joystick.pointerId = event.pointerId;
+  joystick.ox = clamp(point.x, JOYSTICK_RADIUS + 8, view.w - JOYSTICK_RADIUS - 8);
+  joystick.oy = clamp(point.y, JOYSTICK_RADIUS + 8, view.h - JOYSTICK_RADIUS - 8);
+  joystick.x = 0;
+  joystick.y = 0;
+  joystick.amount = 0;
+  try { canvas.setPointerCapture(event.pointerId); } catch { /* synthetic pointers */ }
+  updateJoystick(event);
 }
 
 function moveSlide(event) {
@@ -5527,6 +5550,7 @@ function endDrag() {
 }
 
 function updateJoystick(event) {
+  if (!joystick.active || event.pointerId !== joystick.pointerId) return;
   const point = pointFromEvent(event);
   const vector = joystickVector(point.x - joystick.ox, point.y - joystick.oy, JOYSTICK_RADIUS);
   joystick.x = vector.x;
@@ -5547,10 +5571,17 @@ function bindInput() {
   canvas.addEventListener('pointerdown', (event) => {
     if (gameState !== 'PLAYING') return;
     AudioEngine.unlock();
-    beginSlide(event);
+    if (usesJoystick()) beginJoystick(event);
+    else beginSlide(event);
   });
-  canvas.addEventListener('pointermove', moveSlide);
-  window.addEventListener('pointermove', moveSlide);
+  canvas.addEventListener('pointermove', (event) => {
+    if (usesJoystick()) updateJoystick(event);
+    else moveSlide(event);
+  });
+  window.addEventListener('pointermove', (event) => {
+    if (usesJoystick()) updateJoystick(event);
+    else moveSlide(event);
+  });
   window.addEventListener('pointerup', (event) => {
     endJoystick(event);
     endSlide(event);
@@ -5675,6 +5706,12 @@ function bindUI() {
   });
   document.getElementById('set-language').addEventListener('change', (event) => {
     chooseLanguage(event.target.value);
+  });
+  document.getElementById('set-joystick')?.addEventListener('change', (event) => {
+    settings.control = event.target.checked ? 'joystick' : 'touch';
+    clearJoystick();
+    endDrag();
+    saveSettings();
   });
   document.getElementById('lang-yes').addEventListener('click', () => chooseLanguage(offeredLang || 'en'));
   document.getElementById('lang-no').addEventListener('click', () => chooseLanguage('en'));
